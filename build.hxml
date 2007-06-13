@@ -1,0 +1,4 @@
+-neko bin/server.n
+-main Server.hx
+-cp src
+--override

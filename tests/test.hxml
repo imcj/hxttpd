@@ -1,0 +1,8 @@
+-main Test.hx
+-neko Test.n
+
+--next
+
+-main TestGmtDate.hx
+-x TestGmtDate.n
+-cp ../src

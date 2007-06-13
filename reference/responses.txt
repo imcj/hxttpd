@@ -1,0 +1,78 @@
+CLOSE:
+HTTP/1.1 200 OK
+Date: Fri, 01 Jun 2007 01:12:20 GMT
+Server: Apache
+Last-Modified: Tue, 28 Aug 2001 19:09:26 GMT
+ETag: "56a0d-d4-cfe76580"
+Accept-Ranges: bytes
+Content-Length: 212
+Connection: close
+Content-Type: text/html
+
+<HTML>
+</HTML>
+
+---------------------------------------------------------------------------------------
+KEEPALIVE:
+
+HTTP/1.1 200 OK
+Date: Sat, 02 Jun 2007 20:07:47 GMT
+Server: Apache
+X-Powered-By: PHP/4.4.4
+Set-Cookie: PHPSESSID=c1179f27c302005ddf951c3d37db7982; path=/
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate, post-check=0, pre-check=0
+Pragma: no-cache
+Vary: Accept-Encoding
+Transfer-Encoding: chunked
+Content-Type: text/html
+
+21ea
+<HTML>
+<HEAD>
+
+...
+
+</BODY>
+</HTML>
+
+0\r\n
+\r\n
+
+---------------------------------------------------------------------------------------
+NOT IMPLEMENTED
+(when using get /index.html .. should be GET)
+
+HTTP/1.1 501 Method Not Implemented
+Date: Fri, 01 Jun 2007 01:08:57 GMT
+Server: Apache
+Allow: GET,HEAD,POST,OPTIONS,TRACE
+Content-Length: 215
+Connection: close
+Content-Type: text/html; charset=iso-8859-1
+
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>501 Method Not Implemented</title>
+</head><body>
+<h1>Method Not Implemented</h1>
+<p>get to /index.html not supported.<br />
+</p>
+</body></html>
+
+
+
+
+---------------------------------------------------------------------------------------
+
+User-Agent: Mozilla/5.0 (compatible; Konqueror/3.5; Linux) KHTML/3.5.6 (like Gecko)
+Pragma: no-cache
+Cache-control: no-cache
+Accept: text/html, image/jpeg, image/png, text/*, image/ *, *  /  *
+Accept-Encoding: x-gzip, x-deflate, gzip, deflate
+Accept-Charset: iso-8859-1, utf-8;q=0.5, *;q=0.5
+Accept-Language: en
+Host: localhost:2000
+Connection: Keep-Alive
+
+
