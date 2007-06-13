@@ -2,7 +2,7 @@ all: dummy
 	haxe build.hxml
 
 run:
-	cd html && neko ../bin/server.n
+	cd html && neko ../bin/hxttpd.n
 
 doc: dummy
 	haxe -xml doc/docs.xml build.hxml && cd doc && haxedoc docs.xml && rm docs.xml
@@ -11,7 +11,7 @@ doc: dummy
 dummy:
 
 clean:
-	@rm -f bin/server.n
+	@rm -f bin/hxttpd.n
 	@rm -f tests/*.n
 	@rm -Rf doc/content
 	@rm -f doc/index.html
