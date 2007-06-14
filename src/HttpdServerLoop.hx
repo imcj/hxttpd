@@ -72,7 +72,7 @@ class HttpdServerLoop<ClientData> {
 	/**
 		See [update].
 	**/
-	public var updateTime : Float;
+	public var intervalTime : Float;
 
 	var newData : Socket -> ClientData;
 	var rsocks : Array<Socket>;		// reading sockets
@@ -89,7 +89,7 @@ class HttpdServerLoop<ClientData> {
 		rsocks = new Array();
 		wsocks = new Array();
 		listenCount = 10;
-		updateTime = 1;
+		intervalTime = 1;
 	}
 
 	/**
@@ -129,11 +129,11 @@ class HttpdServerLoop<ClientData> {
 
 	/**
 		The [update] method is called after each socket event has been
-		processed or when [updateTime] has been reached. It can be used
-		to perform time-regular tasks such as pings. By default [updateTime]
+		processed or when [intervalTime] has been reached. It can be used
+		to perform time-regular tasks such as pings. By default [intervalTime]
 		is set to one second.
 	**/
-	public function update() {
+	public function onInterval() {
 	}
 
 	/**
@@ -229,7 +229,7 @@ class HttpdServerLoop<ClientData> {
 		serv.listen(listenCount);
 		rsocks = [serv];
 		while( true ) {
-			var actsock = Socket.select(rsocks,wsocks,null,updateTime);
+			var actsock = Socket.select(rsocks,wsocks,null,intervalTime);
 			for( sa in actsock.write) {
 				var cl : ServerClient<ClientData> = untyped sa.__client;
 				if( cl == null ) {
@@ -282,7 +282,7 @@ class HttpdServerLoop<ClientData> {
 					}
 				}
 			}
-			update();
+			onInterval();
 		}
 		serv.close();
 	}

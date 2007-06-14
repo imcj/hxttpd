@@ -20,6 +20,9 @@ enum ConnectionState {
 	/** during connection before the server has received a complete header */
         STATE_WAITING;
 
+	/** While waiting for complete application/x-www-form-urlencoded content */
+	STATE_DATA;
+
 	/** during response */
         STATE_PROCESSING;
 
@@ -51,17 +54,18 @@ class HttpdClientData {
 
 	public function startNewRequest() : Void {
 		closeFile(); // close last req file, in case.
-		state = STATE_PROCESSING;
 		req = new HttpdRequest();
-		//headers_out = new Hash<String>();
-		//return_code = 200;
 		num_requests ++;
+		timer = 0;
+	}
+
+	public function startResponse() : Void {
+		state = STATE_PROCESSING;
 		timer = 0;
 	}
 
 	public function endRequest() : Void {
 		closeFile();
-		req = null;
 		if(req.keepalive) {
 			trace(here.methodName + " keeping alive");
 			state = STATE_KEEPALIVE;
@@ -70,6 +74,7 @@ class HttpdClientData {
 			trace(here.methodName + " closing");
 			state = STATE_CLOSING;
 		}
+		req = null;
 		timer = 0;
 	}
 

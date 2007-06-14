@@ -20,7 +20,6 @@ import HttpdRequest.HttpMethod;
 import HttpdRequest.ResponseType;
 import HttpdClientData.ConnectionState;
 
-//class HxTTPDTinyServer extends neko.net.ServerLoop<HttpdClientData> {
 class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
 	public static var SERVER_VERSION 	: String	= "0.1";
@@ -34,6 +33,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	public var keepalive_enabled		: Bool;
 	public var keepalive_timeout		: Int;
 	public var connection_timeout		: Int;
+	public var data_timeout			: Int;	// timout for form data etc.
 	public var last_interval		: Int;
 
 	var access_loggers			: List<HttpdLogger>;
@@ -44,12 +44,12 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		var r : EReg = ~/\/$/;
 		this.document_root = r.replace(this.document_root, "");
 		this.index_names = new Array();
-		this.index_names.push("index.htm");
 		this.index_names.push("index.html");
-		this.index_names.push("Mime.hx");
+		this.index_names.push("index.htm");
 		this.keepalive_enabled = false;
 		this.keepalive_timeout = 20;
 		this.connection_timeout = 100;
+		this.data_timeout = 0;
 		this.access_loggers = new List();
 		this.last_interval = Date.now().getSeconds();
 		// parent
@@ -66,16 +66,6 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		default_port = port;
 		super.run(host, port);
 		trace("HxTTPD Server Version " + SERVER_VERSION + " shutdown");
-	}
-
-	/**
-                The [update] method is called after each socket event has been
-                processed or when [updateTime] has been reached. It can be used
-                to perform time-regular tasks such as pings. By default [updateTime]
-                is set to one second.
-        **/
-	override public function update() {
-		onInterval();
 	}
 
 	override public function clientDisconnected( d : HttpdClientData ) {
@@ -134,7 +124,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		//trace(Type.getClass(cdata.remote_host));
 
 		// This is a total hack. Seems Socket.peer().host is an Int32
-		// and not a Host object.
+		// and not a Host object? Any input here would be nice
 		cdata.remote_host = new Host(neko.net.Host.localhost());
 		untyped { cdata.remote_host.ip = sock.peer().host; }
 
@@ -142,7 +132,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		return cdata;
 	}
 
-	public function onInterval() {
+	override public function onInterval() {
 		var sec = Date.now().getSeconds();
 		if(sec == last_interval)
 			return;
@@ -153,6 +143,11 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 			case STATE_WAITING:
 				if(i.timer >= connection_timeout) {
 					trace("Connection timeout");
+					closeConnection(i.sock);
+				}
+			case STATE_DATA:
+				if(data_timeout > 0 && i.timer >= data_timeout) {
+					trace("Timeout waiting for post data");
 					closeConnection(i.sock);
 				}
 			case STATE_PROCESSING:
@@ -176,14 +171,23 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 			var i = buf.indexOf("\r\n\r\n",bufpos);
 			//trace(here.methodName + "\n>>i: "+i);
 			if(i>=0 && i < buflen) {
-				handleClient(d, buf,  bufpos, buflen);
+				if(beginRequest(d, buf,  bufpos, buflen)) {
+					startResponse(d, buf,  bufpos, buflen);
+				}
 				return buflen;
 			}
+		}
+		else if (d.state == STATE_DATA) {
 		}
                 return 0;
 	}
 
-	function handleClient( d : HttpdClientData, buf : String,  bufpos : Int, buflen : Int ) {
+	/**
+		Parse headers and see if request is complete.
+		Return false if connection is closed, or more data needs to come in
+		Return true if request can be handled
+	**/
+	function beginRequest( d : HttpdClientData, buf : String,  bufpos : Int, buflen : Int ) : Bool {
 		var datalen : Int = buflen-bufpos;
 		var data : String  = buf.substr(bufpos, datalen);
 
@@ -195,16 +199,29 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		if(! d.req.processRequest(lines[0])) {
 			trace("Invalid request [" + d.req.return_code + "]",1);
 			closeConnectionError( d );
-			return;
+			return false;
 		}
 		// shift off the request
 		lines.shift();
 		if(! d.req.processHeaders(lines)) {
 			trace("Headers invalid",1);
 			closeConnectionError( d );
-			return;
+			return false;
 		}
 
+		// are we waiting for multipart data?
+		//Content-Type: application/x-www-form-urlencoded
+		//Content-Length: 31
+		if( d.req.in_content_type != null) {
+			d.state = ConnectionState.STATE_DATA;
+			return false;
+		}
+		return true;
+	}
+
+	function startResponse(d : HttpdClientData, buf : String,  bufpos : Int, buflen : Int )
+	{
+		d.startResponse();
 		// process url -> path + args
 		if(! processUrl(d)) {
 			if(d.getResponse() != 304) { // not modified
@@ -214,9 +231,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 			return;
 		}
 		prepareResponse(d);
-		sendResponse(d);
-		//closeConnection(d.sock);
-
+		sendResponse(d);	// handles connection closing
 	}
 
 	function closeConnectionError( d : HttpdClientData) : Void {
@@ -227,13 +242,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		d.req.setMessage(HttpdResponse.codeToHtml(d.getResponse(), url));
 		prepareResponse(d);
 		sendResponse(d);
-		// messages close connections in sendResponse
-		//closeConnection(d.sock);
 	}
-
-
-
-
 
 
 	// process url -> path + args

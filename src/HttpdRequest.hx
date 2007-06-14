@@ -65,6 +65,7 @@ class HttpdRequest {
 	public var if_unmodified_since			: GmtDate;
 	public var if_modified_since			: GmtDate;
 
+	// response to request
 	public var return_code                		: Int;
 	public var headers_out 	        		: List<String>;
 	public var type					: ResponseType;
@@ -126,7 +127,7 @@ class HttpdRequest {
 	public function setRequestHeader(key : String, val : String) : Bool {
 		// request headers are case insensitive
 		key = key.toLowerCase();
-		trace(here.methodName + " Key: " + key + " value: " + val, 5);
+		//trace(here.methodName + " Key: " + key + " value: " + val, 5);
 		if(key == null || val == null)
 			return true;
 		headers_in.set(key, val);
@@ -281,7 +282,9 @@ class HttpdRequest {
 			return false;
 		}
 		version = r.matched(1);
-		if(version != "1.0" && version != "1.1") {
+		if(version == "1.0") {
+			keepalive = false;
+		} else if(version != "1.1") {
 			return_code = 505;
 			return false;
 		}
