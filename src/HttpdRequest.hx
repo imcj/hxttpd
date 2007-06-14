@@ -78,6 +78,7 @@ class HttpdRequest {
 	public var location				: String;
 	public var ranges				: Array<HttpdRange>;
 	public var multipart				: Bool;
+	public var keepalive				: Bool;
 
 	public function new() {
 		init();
@@ -119,12 +120,13 @@ class HttpdRequest {
 		location = null;
 		ranges = null;
 		multipart = false;
+		keepalive = true;	// HTTP/1.1 Default
 	}
 
-	public function setRequestHeader(d : HttpdClientData, key : String, val : String) : Bool {
+	public function setRequestHeader(key : String, val : String) : Bool {
 		// request headers are case insensitive
 		key = key.toLowerCase();
-		HxTTPDTinyServer.trace_debug(here.methodName + " Key: " + key + " value: " + val, 5);
+		trace(here.methodName + " Key: " + key + " value: " + val, 5);
 		if(key == null || val == null)
 			return true;
 		headers_in.set(key, val);
@@ -140,15 +142,15 @@ class HttpdRequest {
 		}
 		if(key == "connection") {
 			if(val.toLowerCase() == "keep-alive")
-				d.keepalive = true;
+				keepalive = true;
 			else
-				d.keepalive = false;
+				keepalive = false;
 			return true;
 		}
 		if(key == "keep-alive") {
 			//Keep-Alive: 300
 			//Connection: keep-alive
-			d.keepalive = true;
+			keepalive = true;
 			return true;
 		}
 		if(key == "content-type") {
@@ -171,14 +173,16 @@ class HttpdRequest {
 			try {
 				var gdate : GmtDate = GmtDate.fromString(val);
 				if(gdate.gt(GmtDate.now())) {
-					HxTTPDTinyServer.log_error(d, "If-Modified-Since date \""+val+"\" is in the future. Ignoring.");
+					// xxx
+					HxTTPDTinyServer.log_error(null, "If-Modified-Since date \""+val+"\" is in the future. Ignoring.");
 					if_modified_since = null;
 				}
 				else { if_modified_since = gdate; }
 			}
-			catch(e : Dynamic) { 
+			catch(e : Dynamic) {
 				if_modified_since = null;
-				HxTTPDTinyServer.log_error(d, "Date parse error for If-Modified-Since date \""+val+"\" " + e);
+				// xxx
+				HxTTPDTinyServer.log_error(null, "Date parse error for If-Modified-Since date \""+val+"\" " + e);
 			}
 			return true;
 		}
@@ -203,11 +207,11 @@ class HttpdRequest {
 			*/
 			return true;
 		}
-		if(key == "if-range") { 
+		if(key == "if-range") {
 		}
 		if(key == "expect") {
 			// expect 100-continue
-			d.req.return_code = 417;
+			return_code = 417;
 			return false;
 		}
 		if(key == "authorization") {
@@ -217,7 +221,7 @@ class HttpdRequest {
 
 
 	function parseRange(val : String) {
-		// either 
+		// either
 		// a) Encompass a range to include the min and max, then do a single range response
 		// b) Do 206 Partial Content
 		//	HTTP/1.1 206 Partial Content
@@ -264,6 +268,104 @@ class HttpdRequest {
 		port = Std.parseInt(parts[1]);
 		if(port == null || port == 0)
 			port = HxTTPDTinyServer.default_port;
+		return true;
+	}
+
+	public function processRequest(line : String) : Bool {
+		line = StringTools.trim(line);
+		requestline = line; // for logging
+
+		var r : EReg = ~/HTTP\/([0-9.]+)$/g;
+		if(! r.match(line)) {
+			return_code = 505;
+			return false;
+		}
+		version = r.matched(1);
+		if(version != "1.0" && version != "1.1") {
+			return_code = 505;
+			return false;
+		}
+		// wipe out HTTP and trim input
+		line = StringTools.trim(r.replace(line, ""));
+
+		var data = line.split(" ");
+		if(data.length == 0) {
+			return_code = 400;
+			return false;
+		}
+		if(data[0] == "GET") {
+			method = METHOD_GET;
+		}
+		else if(data[0] == "HEAD") {
+			method = METHOD_HEAD;
+		}
+		else if(data[0] == "POST") {
+			method = METHOD_POST;
+		}
+		if(method == METHOD_UNKNOWN) {
+			return_code = 501;
+			return false;
+		}
+
+		if(data.length != 2) {
+			return_code = 404;
+			return false;
+		}
+		url = data[1];
+		// Request-URI Too Long
+		if(url.length > 1024) {
+			return_code = 414;
+			return false;
+		}
+		return true;
+	}
+
+	public function processHeaders(lines : Array<String>) : Bool {
+		var key : String = null;
+		var lastkey : String = null;
+		var value : String = null;
+		for(i in lines) {
+			if(lastkey != null) {
+				// single space or tab is value continuation
+				if(i.charAt(0) == " " || i.charAt(0) == "\t") {
+					// rfc 2616 sec 2.2 (may replace continuation with SP)
+					value = value + " " + StringTools.trim(i);
+					if(!setRequestHeader(lastkey, value)) {
+						trace("Request: invalid header "+i);
+						if(return_code == 0)
+							return_code = 400;
+						return false;
+					}
+					continue;
+				}
+				lastkey = null;
+			}
+			if(lastkey == null) {
+				i = StringTools.trim(i);
+				if(i.length == 0) continue;
+				var p = i.indexOf(":");
+				if( p < 2 || p >= i.length - 1 ) {
+					trace("Request: invalid short header "+i);
+					return_code = 400;
+					return false;
+				}
+				key = StringTools.trim(i.substr(0, p));
+				value = StringTools.trim(i.substr(p+1));
+				//trace(here.methodName + " p: "+p+" key: "+key+" value: "+value);
+			}
+			if(!setRequestHeader(key, value)) {
+				trace("Request: invalid header "+i);
+				if(return_code == 0)
+					return_code = 400;
+				return false;
+			}
+			lastkey = key;
+		}
+		// HTTP/1.1 with no host specified
+		if(version_minor > 0 && host == null) {
+			return_code = 400;
+			return false;
+		}
 		return true;
 	}
 

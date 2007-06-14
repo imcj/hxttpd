@@ -92,7 +92,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		var handled : Int = onClientData( d, buf, bufpos, buflen);
 		return handled;
 	}
-	
+
 
 	override public function writeClientData(  d : HttpdClientData ) {
 		// TODO: Multipart/ranges
@@ -102,7 +102,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		var nbytes = d.req.bytes_left;
 		if(nbytes > HttpdServerLoop.MAX_OUTBUFSIZE)
 			nbytes = HttpdServerLoop.MAX_OUTBUFSIZE;
-		
+
 		var s = d.req.file.read(nbytes);
 		clientWrite(d.sock, s, 0, s.length);
 		d.req.bytes_left -= nbytes;
@@ -192,14 +192,14 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		d.startNewRequest();
 		data = StringTools.replace(data, "\r\n", "\n");
 		var lines = data.split("\n");
-		if(! processRequest(d, lines[0])) {
+		if(! d.req.processRequest(lines[0])) {
 			trace("Invalid request [" + d.req.return_code + "]",1);
 			closeConnectionError( d );
 			return;
 		}
 		// shift off the request
 		lines.shift();
-		if(! processHeaders(d, lines)) {
+		if(! d.req.processHeaders(lines)) {
 			trace("Headers invalid",1);
 			closeConnectionError( d );
 			return;
@@ -214,13 +214,13 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 			return;
 		}
 		prepareResponse(d);
-		sendResponse(d);	
+		sendResponse(d);
 		//closeConnection(d.sock);
 
 	}
 
 	function closeConnectionError( d : HttpdClientData) : Void {
-		d.keepalive = false;
+		d.req.keepalive = false;
 		var url = d.req.url;
 		if(d.getResponse() == 301)
 			url = d.req.location;
@@ -231,104 +231,9 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		//closeConnection(d.sock);
 	}
 
-	function processRequest(d : HttpdClientData, line : String) : Bool {
-		trace(here.methodName);
-		line = StringTools.trim(line);
-		d.req.requestline = line; // for logging
 
-		var r : EReg = ~/HTTP\/([0-9.]+)$/g;
-		if(! r.match(line)) {
-			d.setResponse(505);
-			return false;
-		}
-		d.req.version = r.matched(1);
-		if(d.req.version != "1.0" && d.req.version != "1.1") {
-			d.setResponse(505);
-			return false;
-		}
-		// wipe out HTTP and trim input
-		line = StringTools.trim(r.replace(line, ""));
 
-		var data = line.split(" ");
-		if(data.length == 0) {
-			d.setResponse(400);
-			return false;
-		}
-		if(data[0] == "GET") {
-			d.req.method = METHOD_GET;
-		}
-		else if(data[0] == "HEAD") {
-			d.req.method = METHOD_HEAD;
-		}
-		else if(data[0] == "POST") {
-			d.req.method = METHOD_POST;
-		}
-		if(d.req.method == METHOD_UNKNOWN) {
-			d.setResponse(501);
-			return false;
-		}
-		
-		if(data.length != 2) {
-			d.setResponse(404);
-			return false;
-		}
-		d.req.url = data[1];
-		// Request-URI Too Long
-		if(d.req.url.length > 1024) {
-			d.setResponse(414);
-			return false;
-		}
-		return true;
-	}
 
-	function processHeaders(d : HttpdClientData, lines : Array<String>) : Bool {
-		var key : String = null;
-		var lastkey : String = null;
-		var value : String = null;
-		for(i in lines) {
-			if(lastkey != null) {
-				// single space or tab is value continuation
-				if(i.charAt(0) == " " || i.charAt(0) == "\t") {
-					// rfc 2616 sec 2.2 (may replace continuation with SP)
-					value = value + " " + StringTools.trim(i);
-					if(!d.req.setRequestHeader(d, lastkey, value)) {
-						trace("Request: invalid header "+i);
-						if(d.req.return_code == 0)
-							d.setResponse(400);
-						return false;
-					}
-					continue;
-				}
-				lastkey = null;
-			}
-			if(lastkey == null) {
-				i = StringTools.trim(i);
-				if(i.length == 0) continue;
-				var p = i.indexOf(":");
-				if( p < 2 || p >= i.length - 1 ) {
-					trace("Request: invalid short header "+i);
-					d.setResponse(400);
-					return false;
-				}
-				key = StringTools.trim(i.substr(0, p));
-				value = StringTools.trim(i.substr(p+1));
-				//trace(here.methodName + " p: "+p+" key: "+key+" value: "+value);
-			}
-			if(!d.req.setRequestHeader(d, key, value)) {
-				trace("Request: invalid header "+i);
-				if(d.req.return_code == 0)
-					d.setResponse(400);
-				return false;
-			}
-			lastkey = key;
-		}
-		// HTTP/1.1 with no host specified
-		if(d.req.version_minor > 0 && d.req.host == null) {
-			d.setResponse(400);
-			return false;
-		}
-		return true;		
-	}
 
 
 	// process url -> path + args
@@ -397,7 +302,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		var trail : Bool = { if(d.req.path.charAt(d.req.path.length-1) == "/") true; else false; }
 		var items = d.req.path.split("/");
 		var i : Int = 0;
-		var newpathitems : Array<String> = new Array(); 
+		var newpathitems : Array<String> = new Array();
 		for( x in 0 ... items.length ) {
 			if(items[x] == null || items[x].length == 0)
 				continue;
@@ -433,8 +338,8 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	/**
 		Translate a path to actual file type, checks for
 		index docs on directories and symlinks, 404's any
-		pipe or other special files, or any file that can 
-		not be opened. 
+		pipe or other special files, or any file that can
+		not be opened.
 	**/
 	function translatePath(d : HttpdClientData) : Bool {
 		// TODO alias directories and such
@@ -523,7 +428,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		d.req.content_count = 1;
 		setMimeType(d, filename);
 		trace(here.methodName + " file: " + filename + " size: " + stat.size);
-		return true; 
+		return true;
 	}
 
 	function setMimeType(d : HttpdClientData, filename : String) : Bool {
@@ -559,7 +464,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 				d.setResponse(304);
 				d.closeFile();
 				return false;
-			} 
+			}
 		}
 		// TODO
 		// if_unmodified_since
@@ -577,7 +482,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
 		if (d.req.in_content_length > 0 || d.req.in_transfer_encoding != null) {
 			//log_d("client sent request-body; turning off keepalive");
-			d.keepalive = false;
+			d.req.keepalive = false;
 		}
 
 		if(d.req.content_count > 0 && d.getResponse() != 206) {
@@ -599,7 +504,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 			else {
 				d.req.addResponseHeader("Content-type", "multipart/byteranges; boundary=THIS_STRING_SEPARATES");
 			}
-			// in the case of multipart, the content-type for the file is sent in the 
+			// in the case of multipart, the content-type for the file is sent in the
 			// multipart sections
 		case 301:
 			if(d.req.location != null)
@@ -626,15 +531,15 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 			// type.
 
 			d.req.addResponseHeader("Content-Range", "bytes */"+d.req.content_length);
-	
+
 			// which means... what, return only satisfiable ranges, and silently
 			// ignore the rest??
 		}
 
 		// 300s are redirects, not modified
 		if(d.getResponse() < 300 || d.getResponse() == 301 || d.getResponse() == 302) {
-			if(d.keepalive == true && d.req.version_minor == 0) {
-				d.req.addResponseHeader("Connection", "keep-alive");				
+			if(d.req.keepalive == true && d.req.version_minor == 0) {
+				d.req.addResponseHeader("Connection", "keep-alive");
 			}
 			else if(d.req.version_minor > 0) {
 				d.req.addResponseHeader("Connection", "close");
@@ -672,8 +577,8 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	static public function log_error(d : HttpdClientData, msg : String, ?level : Int)
 	{
 		if(level == null || level == 0) level = 1;
-		//if(lvl <= log_error_level)
-			trace_debug("Error: "+msg, level);
+		if(level <= debug_level)
+			trace("Error: "+msg);
 	}
 
 	function log_request(d : HttpdClientData)
@@ -683,11 +588,6 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		}
 	}
 
-	static public function trace_debug(msg : String, ?lvl : Int) {
-		if(lvl == null || lvl == 0) lvl = 1;
-		if(lvl <= debug_level)
-			trace(msg); 
-	}
 }
 
 

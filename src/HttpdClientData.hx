@@ -18,16 +18,16 @@ import HttpdRequest.HttpMethod;
 
 enum ConnectionState {
 	/** during connection before the server has received a complete header */
-        STATE_WAITING; 		
+        STATE_WAITING;
 
 	/** during response */
-        STATE_PROCESSING;	
+        STATE_PROCESSING;
 
 	/** After initial response completed */
         STATE_KEEPALIVE;
 
 	/** No keepalive, we're closing */
-	STATE_CLOSING;	
+	STATE_CLOSING;
 }
 
 
@@ -39,16 +39,13 @@ class HttpdClientData {
 	public var req 			: HttpdRequest;
 	private var num_requests	: Int;
 	public var timer		: Int;
-	public var keepalive		: Bool;
 
 	public function new(s:Socket) {
 		sock = s;
 		state = STATE_WAITING;
-		//req = new HttpdRequest();
 		req = null;
 		num_requests = 0;
 		timer = 0;
-		keepalive = false; // wait for header in request
 	}
 
 
@@ -60,13 +57,12 @@ class HttpdClientData {
 		//return_code = 200;
 		num_requests ++;
 		timer = 0;
-		keepalive = false;
 	}
 
 	public function endRequest() : Void {
 		closeFile();
 		req = null;
-		if(keepalive) {
+		if(req.keepalive) {
 			trace(here.methodName + " keeping alive");
 			state = STATE_KEEPALIVE;
 		}
@@ -76,11 +72,6 @@ class HttpdClientData {
 		}
 		timer = 0;
 	}
-
-	//public function addResponseHeader(key : String, value : String) : Void
-	//{
-	//	headers_out.set(key, value);
-	//}
 
 	/** Set response code for current request */
 	public function setResponse(val : Int) : Void {
