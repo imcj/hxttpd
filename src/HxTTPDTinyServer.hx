@@ -72,11 +72,11 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	override public function onClientDisconnected( d : HttpdClientData ) {
 		trace(here.methodName);
 	}
-	*/
 
 	override public function onError( e : Dynamic ) {
 		super.onError(e);
 	}
+	*/
 
 	override public function onInternalError( d : HttpdClientData, e : Dynamic ) {
 		d.setResponse(500);
@@ -480,9 +480,9 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		}
 		*/
 		if(d.req.if_modified_since != null) {
-			trace("HAS MODIFIED DATE file: " + d.req.last_modified.rfc822timestamp() + " browser: "+ d.req.if_modified_since.rfc822timestamp());
+			//trace("HAS MODIFIED DATE file: " + d.req.last_modified.rfc822timestamp() + " browser: "+ d.req.if_modified_since.rfc822timestamp());
 			if(d.req.last_modified.lt(d.req.if_modified_since) || d.req.last_modified.eq(d.req.if_modified_since)) {
-				trace("File not modified");
+				//trace("File not modified");
 				d.setResponse(304);
 				d.closeFile();
 				return false;
@@ -519,7 +519,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 				d.req.addResponseHeader("Content-Range", "bytes " + d.req.ranges[0].off_start + "-" + d.req.ranges[0].off_end + "/" + d.req.content_length);
 			}
 			else {
-				d.req.addResponseHeader("Content-type", "multipart/byteranges; boundary=THIS_STRING_SEPARATES");
+				d.req.addResponseHeader("Content-type", "multipart/byteranges; boundary="+d.req.content_boundary);
 			}
 			// in the case of multipart, the content-type for the file is sent in the
 			// multipart sections

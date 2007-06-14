@@ -67,11 +67,9 @@ class HttpdClientData {
 	public function endRequest() : Void {
 		closeFile();
 		if(req.keepalive) {
-			trace(here.methodName + " keeping alive");
 			state = STATE_KEEPALIVE;
 		}
 		else {
-			trace(here.methodName + " closing");
 			state = STATE_CLOSING;
 		}
 		req = null;
