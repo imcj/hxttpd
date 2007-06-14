@@ -56,11 +56,12 @@ class HttpdRequest {
 	public var headers_out 	        		: List<String>;
 	public var type					: ResponseType;
 	public var message				: String;
-	public var file					: FileInput; // file handle
+	public var file					: FileInput;
 	public var bytes_left				: Int;
 	public var content_count			: Int;
 	public var content_type			 	: String;
 	public var content_length 			: Int;
+	public var content_boundary(default,null)	: String;
 	public var last_modified			: GmtDate;
 	public var location				: String;
 	public var ranges				: Array<HttpdRange>;
@@ -104,11 +105,34 @@ class HttpdRequest {
 		content_count = 0;
 		content_type = null;
 		content_length = 0;
+		content_boundary = generateContentBoundary();
 		last_modified = null;
 		location = null;
 		ranges = null;
 		multipart = false;
 		keepalive = true;	// HTTP/1.1 Default
+	}
+
+	/**
+		Create a response content boundary string.
+		TODO: This should notbe called on initialization
+			of the request
+	**/
+	function generateContentBoundary() : String {
+		var s : String = "------------";
+		for(x in 0...55) {
+			var r = Std.random(62);
+			if(r < 10) { // 0-9
+				s += Std.chr(48 + r);
+			}
+			else if(r < 36) { // A-Z
+				s += Std.chr(55 + r);
+			}
+			else { // a-z
+				s += Std.chr(61 + r);
+			}
+		}
+		return s;
 	}
 
 	public function setRequestHeader(key : String, val : String) : Bool {
@@ -280,6 +304,11 @@ class HttpdRequest {
 	public function processRequest(line : String) : Bool {
 		line = StringTools.trim(line);
 		requestline = line; // for logging
+
+		if(line.length == 0) {
+			return_code = 400;
+			return false;
+		}
 
 		var r : EReg = ~/HTTP\/([0-9.]+)$/g;
 		if(! r.match(line)) {

@@ -10,7 +10,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import neko.net.ServerLoop;
 import neko.net.Socket;
 import neko.net.Host;
 import neko.FileSystem;
@@ -37,6 +36,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	public var last_interval		: Int;
 
 	var access_loggers			: List<HttpdLogger>;
+	var error_loggers			: List<HttpdLogger>;
 
 	public function new() {
 		super(onConnect);
@@ -200,6 +200,11 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
 		d.startNewRequest();
 		data = StringTools.replace(data, "\r\n", "\n");
+		if(data.length == 0) {
+			d.req.return_code = 400;
+			closeConnectionError( d );
+			return false;
+		}
 		var lines = data.split("\n");
 		if(! d.req.processRequest(lines[0])) {
 			trace("Invalid request [" + d.req.return_code + "]",1);
@@ -497,11 +502,6 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
 	function prepareResponse(d : HttpdClientData) {
 
-		if (d.req.in_content_length > 0 || d.req.in_transfer_encoding != null) {
-			//log_d("client sent request-body; turning off keepalive");
-			d.req.keepalive = false;
-		}
-
 		if(d.req.content_count > 0 && d.getResponse() != 206) {
 			d.req.addResponseHeader("Content-Type", d.req.content_type);
 			if(d.req.last_modified != null)
@@ -553,8 +553,12 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 			// ignore the rest??
 		}
 
+		if (d.req.in_content_length > 0 || d.req.in_transfer_encoding != null) {
+			d.req.keepalive = false;
+		}
+
 		// 300s are redirects, not modified
-		if(d.getResponse() < 300 || d.getResponse() == 301 || d.getResponse() == 302) {
+		if(d.req.return_code < 300 || d.req.return_code == 301 || d.req.return_code == 302) {
 			if(d.req.keepalive == true && d.req.version_minor == 0) {
 				d.req.addResponseHeader("Connection", "keep-alive");
 			}
@@ -594,8 +598,12 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	static public function log_error(d : HttpdClientData, msg : String, ?level : Int)
 	{
 		if(level == null || level == 0) level = 1;
-		if(level <= debug_level)
+		if(level <= debug_level) {
 			trace("Error: "+msg);
+			//for(i in error_loggers) {
+			//	i.log(d);
+			//}
+		}
 	}
 
 	function log_request(d : HttpdClientData)
