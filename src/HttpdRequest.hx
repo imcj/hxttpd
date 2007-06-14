@@ -354,7 +354,6 @@ class HttpdRequest {
 				}
 				key = StringTools.trim(i.substr(0, p));
 				value = StringTools.trim(i.substr(p+1));
-				//trace(here.methodName + " p: "+p+" key: "+key+" value: "+value);
 			}
 			if(!setRequestHeader(key, value)) {
 				trace("Request: invalid header "+i);
@@ -372,5 +371,11 @@ class HttpdRequest {
 		return true;
 	}
 
+	public function addContentIn(buf : String, bufpos : Int, buflen : Int ) {
+		trace(here.methodName + " in_content_type "+ in_content_type);
+		var data : String  = buf.substr(bufpos, buflen);
+		trace(here.methodName + " " + data);
+		return 0;
+	}
 }
 

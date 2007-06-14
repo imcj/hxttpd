@@ -102,7 +102,7 @@ class HttpdServerLoop<ClientData> {
 		rsocks.remove(s);
 		wsocks.remove(s);
 		try s.close() catch( e : Dynamic ) { };
-		clientDisconnected(cl.data);
+		onClientDisconnected(cl.data);
 		return true;
 	}
 
@@ -139,7 +139,7 @@ class HttpdServerLoop<ClientData> {
 	/**
 		This method is called after a client has been disconnected.
 	**/
-	public function clientDisconnected( d : ClientData ) {
+	public function onClientDisconnected( d : ClientData ) {
 	}
 
 	/**
@@ -166,16 +166,16 @@ class HttpdServerLoop<ClientData> {
 		that needs to be removed from the buffer. It the data can't be handled (some
 		part of the message is missing for example), returns 0.
 	**/
-	public function processClientData( d : ClientData, buf : String, bufpos : Int, buflen : Int ) {
-		throw "HttpdServerLoop::processClientData is not implemented";
+	public function onClientData( d : ClientData, buf : String, bufpos : Int, buflen : Int ) {
+		throw "HttpdServerLoop::onClientData is not implemented";
 		return 0;
 	}
 
 	/**
 		This method is called when a socket can be written to.
 	**/
-	public function writeClientData( d : ClientData ) {
-		throw "HttpdServerLoop::writeClientData is not implemented";
+	public function onClientWritable( d : ClientData ) {
+		throw "HttpdServerLoop::onClientWritable is not implemented";
 		return 0;
 	}
 
@@ -210,7 +210,7 @@ class HttpdServerLoop<ClientData> {
 	function processData( cl : ServerClient<ClientData> ) {
 		var pos = 0;
 		while( cl.bufbytes > 0 ) {
-			var nbytes = processClientData(cl.data,cl.buffer,pos,cl.bufbytes);
+			var nbytes = onClientData(cl.data,cl.buffer,pos,cl.bufbytes);
 			if( nbytes == 0 )
 				break;
 			pos += nbytes;
@@ -237,7 +237,7 @@ class HttpdServerLoop<ClientData> {
 				}
 				// read & process the data
 				try {
-					writeClientData(cl.data);
+					onClientWritable(cl.data);
 				} catch( e : Dynamic ) {
 					if( !Std.is(e,neko.io.Eof) )
 						onError(e);

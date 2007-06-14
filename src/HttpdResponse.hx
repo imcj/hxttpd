@@ -60,7 +60,7 @@ class HttpdResponse {
 		htmlmap.set(414, initHtml(html,codeToText(414), "The URI ~URL~ supplied by your browser is too long."));
 		htmlmap.set(417, initHtml(html,codeToText(417), "Expectation can not be met by this server."));
 		htmlmap.set(500, initHtml(html,codeToText(500), "The server encountered an internal error."));
-		htmlmap.set(501, initHtml(html,codeToText(501), "The server does not handle this typpe of request."));
+		htmlmap.set(501, initHtml(html,codeToText(501), "The server does not handle this type of request."));
 		htmlmap.set(505, initHtml(html,codeToText(505), "The server does not speak this version of the HTTP protocol."));
 	}
 

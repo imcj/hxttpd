@@ -68,23 +68,13 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		trace("HxTTPD Server Version " + SERVER_VERSION + " shutdown");
 	}
 
-	override public function clientDisconnected( d : HttpdClientData ) {
+	/*
+	override public function onClientDisconnected( d : HttpdClientData ) {
 		trace(here.methodName);
 	}
+	*/
 
-	/**
-                This method is called when some data has been readed into a Client buffer.
-                If the data can be handled, then you can return the number of bytes handled
-                that needs to be removed from the buffer. It the data can't be handled (some
-                part of the message is missing for example), returns 0.
-        **/
-	override public function processClientData( d : HttpdClientData, buf : String, bufpos : Int, buflen : Int ) {
-		var handled : Int = onClientData( d, buf, bufpos, buflen);
-		return handled;
-	}
-
-
-	override public function writeClientData(  d : HttpdClientData ) {
+	override public function onClientWritable(  d : HttpdClientData ) {
 		// TODO: Multipart/ranges
 		if(d.req.bytes_left == null) {
 			d.req.bytes_left = d.req.content_length;
@@ -165,19 +155,25 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		}
 	}
 
-        public function onClientData( d : HttpdClientData, buf : String, bufpos : Int, buflen : Int ) : Int {
+        override public function onClientData( d : HttpdClientData, buf : String, bufpos : Int, buflen : Int ) : Int {
 		//trace("\n>> "+here.methodName + "\n>> buf: "+buf+"\n>> bufpos: "+bufpos+"\n>> buflen: "+buflen);
 		if( d.state == STATE_WAITING || d.state == STATE_KEEPALIVE) {
 			var i = buf.indexOf("\r\n\r\n",bufpos);
 			//trace(here.methodName + "\n>>i: "+i);
 			if(i>=0 && i < buflen) {
-				if(beginRequest(d, buf,  bufpos, buflen)) {
+				if(beginRequest(d, buf,  bufpos, i)) {
 					startResponse(d, buf,  bufpos, buflen);
 				}
-				return buflen;
+				return i + 4;
 			}
 		}
 		else if (d.state == STATE_DATA) {
+			trace(buflen);
+			if(buflen == d.req.in_content_length) {
+				d.req.addContentIn(buf, bufpos, buflen);
+				startResponse(d, buf,  bufpos, buflen);
+				return buflen;
+			}
 		}
                 return 0;
 	}
@@ -188,10 +184,9 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		Return true if request can be handled
 	**/
 	function beginRequest( d : HttpdClientData, buf : String,  bufpos : Int, buflen : Int ) : Bool {
-		var datalen : Int = buflen-bufpos;
-		var data : String  = buf.substr(bufpos, datalen);
+		var data : String  = buf.substr(bufpos, buflen);
 
-		trace(">> handleClient\nINPUT DATA FOLLOWS\n"+StringTools.trim(data)+"\nINPUT DATA END >> bufpos: "+bufpos+" buflen: "+buflen,3);
+		trace(here.methodName + " >> INPUT DATA FOLLOWS\n"+StringTools.trim(data)+"\nINPUT DATA END >> bufpos: "+bufpos+" buflen: "+buflen,3);
 
 		d.startNewRequest();
 		data = StringTools.replace(data, "\r\n", "\n");
@@ -460,12 +455,14 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		Called from translatePath()
 	**/
 	function processFile(d : HttpdClientData) : Bool {
+		/*
 		if(d.req.method == HttpMethod.METHOD_POST) {
 			trace("POST Method currently unimplemented.");
 			d.closeFile();
-			d.setResponse(400);
+			d.setResponse(501);
 			return false;
 		}
+		*/
 		if(d.req.if_modified_since != null) {
 			trace("HAS MODIFIED DATE file: " + d.req.last_modified.rfc822timestamp() + " browser: "+ d.req.if_modified_since.rfc822timestamp());
 			if(d.req.last_modified.lt(d.req.if_modified_since) || d.req.last_modified.eq(d.req.if_modified_since)) {
