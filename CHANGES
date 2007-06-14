@@ -1,0 +1,8 @@
+0.2 - 14 June 2007
+	Handles form content types:
+		application/x-www-form-urlencoded
+		multipart/form-data
+	POST data is currently eaten by the server, as there is no CGI interface
+
+0.1 - 13 June 2007
+	Initial import

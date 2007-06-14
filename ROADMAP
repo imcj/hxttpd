@@ -1,10 +1,10 @@
 0.1 Serve GET for static pages
 0.2 Finish request vars and POST
 0.3 Implement ranges
-0.4 Multipart
+0.4 Multipart/Chunked encoding
 0.5 Configuration
 0.6 Logging
 0.7 ?
-0.8 FastCGI
+0.8 FastCGI/Any CGI to handle all the POST
 0.9 Test
 1.0 Release something that works

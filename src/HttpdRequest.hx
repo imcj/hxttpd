@@ -10,7 +10,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 import neko.io.File;
 import neko.io.FileInput;
 
@@ -26,20 +25,6 @@ enum ResponseType {
 	TYPE_FILE;
 	TYPE_CGI;
 }
-
-/*
-typedef HttpHeader = {
-	var name : String;
-	var value : String;
-}
-typedef HttpCode = {
-	var code : Int;
-	var msg : String;
-}
-*/
-
-
-
 
 class HttpdRequest {
 	public var requestline				: String;
@@ -60,6 +45,7 @@ class HttpdRequest {
 	public var in_content_type			: String;
 	public var in_content_length			: Int;
 	public var in_transfer_encoding			: String;
+	public var in_content_boundary			: String;
 	public var username				: String;
 	public var cpassword				: String;
 	public var if_unmodified_since			: GmtDate;
@@ -102,6 +88,7 @@ class HttpdRequest {
 		in_content_type = null;
 		in_content_length = 0;
 		in_transfer_encoding = null;
+		in_content_boundary = null;
 		username = null;
 		cpassword = null;
 		if_unmodified_since = null;
@@ -155,7 +142,25 @@ class HttpdRequest {
 			return true;
 		}
 		if(key == "content-type") {
-			in_content_type = val;
+			//application/x-www-form-urlencoded
+			// or
+			//multipart/form-data; boundary=---------------------------262812997472408787435964820
+			var p = val.indexOf(";");
+			if( p == 1 || p >= val.length - 1 ) {
+				trace("Request: invalid content-type " + val);
+				return_code = 400;
+				return false;
+			}
+			if(p > 0) {
+				in_content_type = StringTools.trim(val.substr(0, p));
+				val = StringTools.trim(val.substr(p+1));
+				if(val.substr(0,9) == "boundary=") {
+					in_content_boundary = val.substr(10);
+				}
+			}
+			else {
+				in_content_type = val;
+			}
 			return true;
 		}
 		if(key == "content-length") {
@@ -372,10 +377,34 @@ class HttpdRequest {
 	}
 
 	public function addContentIn(buf : String, bufpos : Int, buflen : Int ) {
-		trace(here.methodName + " in_content_type "+ in_content_type);
+		trace(here.methodName + " in_content_type "+ in_content_type + "["+in_content_boundary+"]");
 		var data : String  = buf.substr(bufpos, buflen);
-		trace(here.methodName + " " + data);
+		trace(here.methodName + " >> DATA FOLLOWS\n" + data + "\n>> END OF POST DATA");
 		return 0;
 	}
 }
 
+/*
+	// Multipart when using "form upload.html" and sending one file
+	// NOTE the trailing two - signs on the final boundary
+
+------------cKRzOp35uw7dhIsNbEEs5FOtOSwpRWr4qI1C83G2zLdfdV0FiE5lTRc
+Content-Disposition: form-data; name="somename"; filename="code"
+Content-Type: text/x-objcsrc
+
+... File DATA HERE ...
+
+------------cKRzOp35uw7dhIsNbEEs5FOtOSwpRWr4qI1C83G2zLdfdV0FiE5lTRc
+Content-Disposition: form-data; name="submit"
+
+button
+------------cKRzOp35uw7dhIsNbEEs5FOtOSwpRWr4qI1C83G2zLdfdV0FiE5lTRc--
+*/
+
+/*
+	// Normal form elements
+HttpdRequest.hx:393: addContentIn in_content_type application/x-www-form-urlencoded[null]
+HttpdRequest.hx:395: addContentIn >> DATA FOLLOWS
+textfield=my+text&submit=button
+>> END OF POST DATA
+*/

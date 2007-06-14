@@ -187,6 +187,14 @@ class HttpdServerLoop<ClientData> {
 		trace(Std.string(e)+"\n"+haxe.Stack.toString(haxe.Stack.exceptionStack()));
 	}
 
+	/**
+		Called when an error that should generate a 500 response occurs.
+		By default the error is displayed using [trace].
+	**/
+	public function onInternalError( d : ClientData, e : Dynamic ) {
+		trace(Std.string(e)+"\n"+haxe.Stack.toString(haxe.Stack.exceptionStack()));
+	}
+
 	function readData( cl : ServerClient<ClientData> ) {
 		var buflen = cl.buffer.length;
 		// eventually double the buffer size
@@ -277,7 +285,7 @@ class HttpdServerLoop<ClientData> {
 						processData(cl);
 					} catch( e : Dynamic ) {
 						if( !Std.is(e,neko.io.Eof) )
-							onError(e);
+							onInternalError(cl.data, e);
 						closeConnection(cl.sock);
 					}
 				}

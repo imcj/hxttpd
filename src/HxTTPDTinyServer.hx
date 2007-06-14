@@ -22,7 +22,7 @@ import HttpdClientData.ConnectionState;
 
 class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
-	public static var SERVER_VERSION 	: String	= "0.1";
+	public static var SERVER_VERSION 	: String	= "0.2";
 	public static var default_port 		: Int		= 80;
 	public static var log_format		: String 	= "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\"";
 	public static var debug_level		: Int		= 4;
@@ -73,6 +73,16 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		trace(here.methodName);
 	}
 	*/
+
+	override public function onError( e : Dynamic ) {
+		super.onError(e);
+	}
+
+	override public function onInternalError( d : HttpdClientData, e : Dynamic ) {
+		d.setResponse(500);
+		prepareResponse(d);
+		sendResponse(d);
+	}
 
 	override public function onClientWritable(  d : HttpdClientData ) {
 		// TODO: Multipart/ranges
@@ -169,7 +179,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		}
 		else if (d.state == STATE_DATA) {
 			trace(buflen);
-			if(buflen == d.req.in_content_length) {
+			if(buflen >= d.req.in_content_length) {
 				d.req.addContentIn(buf, bufpos, buflen);
 				startResponse(d, buf,  bufpos, buflen);
 				return buflen;
@@ -242,7 +252,8 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
 	// process url -> path + args
 	function processUrl(d : HttpdClientData) : Bool {
-		var url = d.req.url;
+		var url = StringTools.urlDecode(d.req.url);
+		d.req.url = url;
 		if(url == null) {
 			d.setResponse(400);
 			return false;
