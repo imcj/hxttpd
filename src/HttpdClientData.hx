@@ -23,6 +23,9 @@ enum ConnectionState {
 	/** While waiting for complete application/x-www-form-urlencoded content */
 	STATE_DATA;
 
+	/** Input data complete. Process on next interval */
+	STATE_READY;
+
 	/** during response */
         STATE_PROCESSING;
 
@@ -54,9 +57,13 @@ class HttpdClientData {
 
 	public function startNewRequest() : Void {
 		closeFile(); // close last req file, in case.
-		req = new HttpdRequest();
+		req = new HttpdRequest(this);
 		num_requests ++;
 		timer = 0;
+	}
+
+	public function markReady() : Void {
+		state = STATE_READY;
 	}
 
 	public function startResponse() : Void {

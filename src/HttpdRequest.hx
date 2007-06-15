@@ -46,6 +46,7 @@ class HttpdRequest {
 	public var in_content_length			: Int;
 	public var in_transfer_encoding			: String;
 	public var in_content_boundary			: String;
+	public var in_ranges				: Array<HttpdRange>;
 	public var username				: String;
 	public var cpassword				: String;
 	public var if_unmodified_since			: GmtDate;
@@ -68,7 +69,10 @@ class HttpdRequest {
 	public var multipart				: Bool;
 	public var keepalive				: Bool;
 
-	public function new() {
+	var client					: HttpdClientData;
+
+	public function new(client:HttpdClientData) {
+		this.client = client;
 		init();
 	}
 
@@ -90,6 +94,7 @@ class HttpdRequest {
 		in_content_length = 0;
 		in_transfer_encoding = null;
 		in_content_boundary = null;
+		in_ranges = null;
 		username = null;
 		cpassword = null;
 		if_unmodified_since = null;
@@ -118,7 +123,7 @@ class HttpdRequest {
 		TODO: This should notbe called on initialization
 			of the request
 	**/
-	function generateContentBoundary() : String {
+	public static function generateContentBoundary() : String {
 		var s : String = "------------";
 		for(x in 0...55) {
 			var r = Std.random(62);
@@ -133,6 +138,16 @@ class HttpdRequest {
 			}
 		}
 		return s;
+	}
+
+	public static function parseArgs(s_args:String) : Dynamic {
+		var args = s_args.substr(1).split("&");
+		var r = Reflect.empty();
+		for (a in args) {
+			var v = a.split("=");
+			Reflect.setField(r,StringTools.trim(v[0]),StringTools.trim(v[1]));
+		}
+		return r;
 	}
 
 	public function setRequestHeader(key : String, val : String) : Bool {
@@ -224,14 +239,14 @@ class HttpdRequest {
 			// Invalid ranges are simply ignored. Return the file
 			// Apache just serves the whole file in one multipart/byteranges; boundary
 			//parseRange(val);
-			ranges = HttpdRange.fromString(val);
+			in_ranges = HttpdRange.fromString(val);
 			content_count = ranges.length;
-			if(ranges.length == 0) {
+			if(in_ranges.length == 0) {
 				content_count = 1;
 				ranges = null;
 				return true;
 			}
-			if(ranges.length > 1) {
+			if(in_ranges.length > 1) {
 				multipart = true;
 			}
 			*/
@@ -247,29 +262,6 @@ class HttpdRequest {
 		if(key == "authorization") {
 		}
 		return true;
-	}
-
-
-	function parseRange(val : String) {
-		// either
-		// a) Encompass a range to include the min and max, then do a single range response
-		// b) Do 206 Partial Content
-		//	HTTP/1.1 206 Partial Content
-		//	Date: Wed, 15 Nov 1995 06:25:24 GMT
-		//	Last-Modified: Wed, 15 Nov 1995 04:58:08 GMT
-		//	Content-type: multipart/byteranges; boundary=THIS_STRING_SEPARATES
-		//
-		//	--THIS_STRING_SEPARATES
-		//	Content-type: application/pdf
-		//	Content-range: bytes 500-999/8000
-		//
-		//	...the first range...
-		//	--THIS_STRING_SEPARATES
-		//	Content-type: application/pdf
-		//	Content-range: bytes 7000-7999/8000
-		//
-		//	...the second range
-		//	--THIS_STRING_SEPARATES--
 	}
 
 	public function addResponseHeader(key : String, value : String) : Void
@@ -405,11 +397,65 @@ class HttpdRequest {
 		return true;
 	}
 
-	public function addContentIn(buf : String, bufpos : Int, buflen : Int ) {
-		trace(here.methodName + " in_content_type "+ in_content_type + "["+in_content_boundary+"]");
-		var data : String  = buf.substr(bufpos, buflen);
-		trace(here.methodName + " >> DATA FOLLOWS\n" + data + "\n>> END OF POST DATA");
-		return 0;
+	/**
+		process url -> uri path + args
+		does not do translation to filesystem
+	**/
+	public function processUrl() : Bool {
+		url = StringTools.urlDecode(url);
+		if(url == null) {
+			return_code = 400;
+			return false;
+		}
+		// full url
+		if(url.charAt(0) != "/") {
+			var idx : Int = url.indexOf("//");
+			var newUrl : String;
+			if(idx < 0) {
+				HxTTPDTinyServer.log_error(client, "Absolute URL incomplete "+url, 1);
+				return_code = 400;
+				return false;
+			}
+			idx += 2;
+			var idx2 : Int = url.indexOf("/", idx);
+			if(idx2 < 0) {
+				newUrl = "/";
+				idx2 = url.length;
+			}
+			else {
+				newUrl = url.substr(idx2);
+			}
+			if(! setHost(url.substr(idx, idx2-idx))) {
+				HxTTPDTinyServer.log_error(client, "Absolute URL incomplete "+url, 1);
+				return_code = 400;
+				return false;
+			}
+			url = newUrl;
+			trace(here.methodName + " FULL URL host=" + host + ":" + Std.string(port) + " url="+url);
+		}
+		args = null;
+		var i : Int = url.indexOf("?");
+		if(i < 0) {
+			path = url;
+		}
+		else {
+			path = url.substr(0,i);
+			if(i < url.length - 1)
+				args = url.substr(i+1);
+			trace(path + " args: " + args);
+		}
+		return true;
+	}
+
+	/**
+		Add post data to the request
+		Should actually open a temp file for storage
+	*/
+	public function addPostData(buf : String, bufpos : Int, buflen : Int ) : Bool {
+		//trace(here.methodName + " in_content_type "+ in_content_type + "["+in_content_boundary+"]");
+		post_data += buf.substr(bufpos, buflen);
+		//trace(here.methodName + " >> DATA FOLLOWS\n" + data + "\n>> END OF POST DATA");
+		return true;
 	}
 }
 

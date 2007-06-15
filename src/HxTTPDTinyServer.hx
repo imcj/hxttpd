@@ -134,6 +134,11 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
 	override public function onInterval() {
 		var sec = Date.now().getSeconds();
+		for ( i in clients ) {
+			if(i.state != STATE_READY)
+				continue;
+			startResponse(i);
+		}
 		if(sec == last_interval)
 			return;
 		last_interval = sec;
@@ -150,6 +155,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 					trace("Timeout waiting for post data");
 					closeConnection(i.sock);
 				}
+			case STATE_READY:
 			case STATE_PROCESSING:
 				i.timer = 0;
 			case STATE_KEEPALIVE:
@@ -172,19 +178,20 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 			//trace(here.methodName + "\n>>i: "+i);
 			if(i>=0 && i < buflen) {
 				if(beginRequest(d, buf,  bufpos, i)) {
-					startResponse(d, buf,  bufpos, buflen);
+					d.markReady();
 				}
 				return i + 4;
 			}
 		}
 		else if (d.state == STATE_DATA) {
-			trace(buflen);
-			if(buflen >= d.req.in_content_length) {
-				d.req.addContentIn(buf, bufpos, buflen);
-				startResponse(d, buf,  bufpos, buflen);
-				return buflen;
+			//trace(buflen);
+			d.req.addPostData(buf, bufpos, buflen);
+			if(d.req.post_data.length >= d.req.in_content_length) {
+				d.markReady();
 			}
+			return buflen;
 		}
+		trace("Unexpected data "+ buf.substr(bufpos,buflen));
                 return 0;
 	}
 
@@ -229,14 +236,25 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		return true;
 	}
 
-	function startResponse(d : HttpdClientData, buf : String,  bufpos : Int, buflen : Int )
+	function startResponse(d: HttpdClientData)
 	{
 		d.startResponse();
 		// process url -> path + args
-		if(! processUrl(d)) {
+		if(! d.req.processUrl()) {
 			if(d.getResponse() != 304) { // not modified
 				trace("URL invalid");
 			}
+			closeConnectionError( d );
+			return;
+		}
+		if(!checkPath(d)) {
+			d.setResponse(403);
+			closeConnectionError( d );
+			return;
+		}
+		if(!translatePath(d)) {
+			if(d.req.return_code < 300)
+				d.setResponse(404);
 			closeConnectionError( d );
 			return;
 		}
@@ -255,62 +273,6 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	}
 
 
-	// process url -> path + args
-	function processUrl(d : HttpdClientData) : Bool {
-		var url = StringTools.urlDecode(d.req.url);
-		d.req.url = url;
-		if(url == null) {
-			d.setResponse(400);
-			return false;
-		}
-		// full url
-		if(url.charAt(0) != "/") {
-			var idx : Int = url.indexOf("//");
-			var newUrl : String;
-			if(idx < 0) {
-				log_error(d, "Absolute URL incomplete "+url, 1);
-				d.setResponse(400);
-				return false;
-			}
-			idx += 2;
-			var idx2 : Int = url.indexOf("/", idx);
-			if(idx2 < 0) {
-				newUrl = "/";
-				idx2 = url.length;
-			}
-			else {
-				newUrl = url.substr(idx2);
-			}
-			if(! d.req.setHost(url.substr(idx, idx2-idx))) {
-				log_error(d, "Absolute URL incomplete "+url, 1);
-				d.setResponse(400);
-				return false;
-			}
-			d.req.url = newUrl;
-			trace(here.methodName + " FULL URL host=" + d.req.host + ":" + Std.string(d.req.port) + " url="+d.req.url);
-		}
-
-		var i : Int = d.req.url.indexOf("?");
-		if(i < 0) {
-			d.req.path = d.req.url;
-			d.req.args = null;
-		}
-		else {
-			d.req.path = d.req.url.substr(0,i);
-			d.req.args = d.req.url.substr(i);
-		}
-		if(!checkPath(d)) {
-			d.setResponse(403);
-			return false;
-		}
-		if(!translatePath(d)) {
-			if(d.req.return_code < 300)
-				d.setResponse(404);
-			return false;
-		}
-
-		return true;
-	}
 
 	/**
 		Cleans up the uri and ensures it does not escape the document root (../../)
@@ -595,7 +557,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	}
 
 
-	static public function log_error(d : HttpdClientData, msg : String, ?level : Int)
+	public static function log_error(d : HttpdClientData, msg : String, ?level : Int)
 	{
 		if(level == null || level == 0) level = 1;
 		if(level <= debug_level) {
@@ -606,7 +568,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		}
 	}
 
-	function log_request(d : HttpdClientData)
+	public function log_request(d : HttpdClientData)
 	{
 		for(i in access_loggers) {
 			i.log(d);
