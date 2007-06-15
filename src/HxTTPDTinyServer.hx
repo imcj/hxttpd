@@ -101,10 +101,10 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		if(d.req.bytes_left <= 0) {
 			removeWriteSock(d.sock);
 			d.endRequest();
-			if(d.state == ConnectionState.STATE_CLOSING) {
-				trace(here.methodName + " closing");
-				closeConnection(d.sock);
-			}
+			//if(d.state == ConnectionState.STATE_CLOSING) {
+			//	trace(here.methodName + " closing");
+			//	closeConnection(d.sock);
+			//}
 		}
 		return 0;
 	}
@@ -172,16 +172,17 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	}
 
         override public function onClientData( d : HttpdClientData, buf : String, bufpos : Int, buflen : Int ) : Int {
-		//trace("\n>> "+here.methodName + "\n>> buf: "+buf+"\n>> bufpos: "+bufpos+"\n>> buflen: "+buflen);
+		trace("\n>> "+here.methodName + "\n>> buf: "+buf+"\n>> bufpos: "+bufpos+"\n>> buflen: "+buflen);
 		if( d.state == STATE_WAITING || d.state == STATE_KEEPALIVE) {
-			var i = buf.indexOf("\r\n\r\n",bufpos);
-			//trace(here.methodName + "\n>>i: "+i);
-			if(i>=0 && i < buflen) {
+			var s = buf.substr(bufpos, buflen);
+			var i = s.indexOf("\r\n\r\n");
+			if(i>=0) {
 				if(beginRequest(d, buf,  bufpos, i)) {
 					d.markReady();
 				}
 				return i + 4;
 			}
+			return 0;
 		}
 		else if (d.state == STATE_DATA) {
 			//trace(buflen);
@@ -192,6 +193,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 			return buflen;
 		}
 		trace("Unexpected data "+ buf.substr(bufpos,buflen));
+		trace("Client state is " + Std.string(d.state));
                 return 0;
 	}
 
@@ -546,7 +548,8 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
 		if(d.req.message != null) {
 			clientWrite(d.sock, d.req.message, 0, d.req.message.length);
-			closeConnection(d.sock);
+			//closeConnection(d.sock);
+			d.state = STATE_CLOSING;
 		}
 		else {
 			// add them as a writesocket as there
