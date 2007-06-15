@@ -172,7 +172,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	}
 
         override public function onClientData( d : HttpdClientData, buf : String, bufpos : Int, buflen : Int ) : Int {
-		trace("\n>> "+here.methodName + "\n>> buf: "+buf+"\n>> bufpos: "+bufpos+"\n>> buflen: "+buflen);
+		//trace("\n>> "+here.methodName + "\n>> buf: "+buf+"\n>> bufpos: "+bufpos+"\n>> buflen: "+buflen);
 		if( d.state == STATE_WAITING || d.state == STATE_KEEPALIVE) {
 			var s = buf.substr(bufpos, buflen);
 			var i = s.indexOf("\r\n\r\n");
