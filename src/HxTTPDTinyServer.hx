@@ -279,8 +279,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	/**
 		Cleans up the uri and ensures it does not escape the document root (../../)
 		does not set an error code
-		Called from processUrl
-		TODO: uri must be url decoded first before this is all done.
+		Called after processUrl which urlDecodes the url
 	**/
 	function checkPath(d : HttpdClientData) : Bool {
 		var trail : Bool = { if(d.req.path.charAt(d.req.path.length-1) == "/") true; else false; }
@@ -327,13 +326,13 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	**/
 	function translatePath(d : HttpdClientData) : Bool {
 		// TODO alias directories and such
-		d.req.path_final = document_root;
+		d.req.path_translated = document_root;
 		var p = d.req.path;
-		d.req.path_final += p;
-		trace(here.methodName + " final: " + d.req.path_final);
+		d.req.path_translated += p;
+		trace(here.methodName + " final: " + d.req.path_translated);
 
 		try {
-			switch(FileSystem.kind(d.req.path_final)) {
+			switch(FileSystem.kind(d.req.path_translated)) {
 			case kdir:
 				if(!checkDirIndex( d )) {
 					d.setResponse(404);
@@ -349,7 +348,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 					return false;
 				}
 			case kfile:
-				if(!openFile(d, d.req.path_final)) {
+				if(!d.req.openFile(d, d.req.path_translated)) {
 					d.setResponse(404);
 				}
 			}
@@ -370,7 +369,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
 	function checkDirIndex(d : HttpdClientData) : Bool {
 		trace(here.methodName);
-		if(d.req.path_final.charAt(d.req.path_final.length-1) != "/") {
+		if(d.req.path_translated.charAt(d.req.path_translated.length-1) != "/") {
 			d.setResponse(301);
 			d.req.location = "http://" + d.req.host;
 			if(d.req.port != 0) d.req.location += ":" + Std.string(d.req.port);
@@ -380,8 +379,8 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		var found = false;
 		trace(index_names);
 		for(i in index_names) {
-			//trace("Trying " + d.req.path_final + i);
-			if(openFile(d, d.req.path_final + i)) {
+			//trace("Trying " + d.req.path_translated + i);
+			if(d.req.openFile(d, d.req.path_translated + i)) {
 				//trace("found");
 				found = true;
 				break;
@@ -391,42 +390,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		return true;
 	}
 
-	function openFile(d : HttpdClientData, filename : String) : Bool {
-		if( d.req.file != null ) {
-			log_error(d, "Request already has an open file");
-			return false;
-		}
-		try {
-			d.req.file = File.read(filename, true);
-			trace(here.methodName + d.req.file);
-		}
-		catch(e : Dynamic) { d.req.file = null; return false; }
-		d.req.type = ResponseType.TYPE_FILE;
-		var stat = FileSystem.stat( filename );
-		d.req.last_modified = GmtDate.fromLocalDate(stat.mtime);
-		if(d.req.last_modified.gt(GmtDate.now())) {
-			log_error(d, "File "+filename+" has a modification date in the future");
-			d.req.last_modified = GmtDate.now();
-		}
-		d.req.content_length = stat.size;
-		d.req.content_count = 1;
-		setMimeType(d, filename);
-		trace(here.methodName + " file: " + filename + " size: " + stat.size);
-		return true;
-	}
 
-	function setMimeType(d : HttpdClientData, filename : String) : Bool {
-		d.req.content_type = "unknown/unknown";
-		var r : EReg = ~/\.([0-9A-Za-z]+)$/;
-		r.match(filename);
-		try {
-			//d.req.mime_type = Mime.extensionToMime(r.matched(1));
-			d.req.content_type = Mime.extensionToMime(r.matched(1));
-		}
-		catch(e :Dynamic) {}
-		trace(here.methodName + " " + d.req.content_type);
-		return true;
-	}
 
 	/**
 		Ignore POSTS to files

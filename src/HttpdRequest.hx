@@ -12,6 +12,7 @@
 
 import neko.io.File;
 import neko.io.FileInput;
+import neko.FileSystem;
 
 enum HttpMethod {
 	METHOD_UNKNOWN;
@@ -39,7 +40,7 @@ class HttpdRequest {
 	public var host 				: String;
 	public var port 				: Int;
 	public var path 				: String;
-	public var path_final				: String;
+	public var path_translated			: String;
         public var headers_in 				: Hash<String>;
 	public var post_data 				: String;
 	public var in_content_type			: String;
@@ -87,7 +88,7 @@ class HttpdRequest {
 		host = null;
 		port = 0;
 		path = null;
-		path_final = null;
+		path_translated = null;
 		headers_in = new Hash<String>();
 		post_data = null;
 		in_content_type = null;
@@ -446,6 +447,45 @@ class HttpdRequest {
 		}
 		return true;
 	}
+
+
+	public function openFile(d : HttpdClientData, filename : String) : Bool {
+		if( file != null ) {
+			HxTTPDTinyServer.log_error(client, "Request already has an open file");
+			return false;
+		}
+		try {
+			file = File.read(filename, true);
+			trace(here.methodName + file);
+		}
+		catch(e : Dynamic) { file = null; return false; }
+		type = ResponseType.TYPE_FILE;
+		var stat = FileSystem.stat( filename );
+		last_modified = GmtDate.fromLocalDate(stat.mtime);
+		if(last_modified.gt(GmtDate.now())) {
+			HxTTPDTinyServer.log_error(client, "File "+filename+" has a modification date in the future");
+			last_modified = GmtDate.now();
+		}
+		content_length = stat.size;
+		content_count = 1;
+		setMimeType(d, filename);
+		trace(here.methodName + " file: " + filename + " size: " + stat.size);
+		return true;
+	}
+
+	function setMimeType(d : HttpdClientData, filename : String) : Bool {
+		content_type = "unknown/unknown";
+		var r : EReg = ~/\.([0-9A-Za-z]+)$/;
+		r.match(filename);
+		try {
+			//mime_type = Mime.extensionToMime(r.matched(1));
+			content_type = Mime.extensionToMime(r.matched(1));
+		}
+		catch(e :Dynamic) {}
+		trace(here.methodName + " " + content_type);
+		return true;
+	}
+
 
 	/**
 		Add post data to the request
