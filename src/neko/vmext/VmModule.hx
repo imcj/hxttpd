@@ -163,6 +163,11 @@ class VmModule {
 		if (Reflect.isFunction(func)) {
 			return Reflect.callMethod(instance,func,args);
 		}
+		// check for static method
+		func = Reflect.field(Type.getClass(instance),nMethod);
+		if (Reflect.isFunction(func)) {
+			return Reflect.callMethod(instance,func,args);
+		}
 		throw(nMethod + " is not a valid function");
 		return null;
 	}

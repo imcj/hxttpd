@@ -16,6 +16,13 @@ class LoaderTest {
 		trace("useTest says "+vmm.exec(inst,"getMessage"));
 	}
 
+	static public function staticTest() {
+		var vmm = VmLoader.get("myloader").getCache().get("Test");
+		//fromString(str : String) : Array<String>
+		var res = vmm.call(["fromString"], ["bytes=1000-2000"]);
+		trace(here.methodName + " This should say [1000-2000] >> " + Std.string(res));
+	}
+
 	static public function main() {
 		trace("\n\n**** LoaderTest");
 		var loadA = new neko.vmext.VmLoader();
@@ -53,6 +60,7 @@ class LoaderTest {
 		// use it in this function:
 		registerTest();
 		useTest();
+		staticTest();
 
 
 	}
