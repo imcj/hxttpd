@@ -1,6 +1,9 @@
 // file Server.hx
 class Test {
-	public function new() {}
+	var msg : String;
+	public function new() {
+		msg = "Uninitialized message";
+	}
         public static function fromString(str : String) : Array<String> {
                 var hranges = new Array<String>();
                 str = StringTools.trim(str);
@@ -30,6 +33,13 @@ class Test {
                 }
                 return hranges;
         }
+
+	public function setMessage(str : String) {
+		msg = str;
+	}
+	public function getMessage() : String {
+		return msg;
+	}
 
     static function main() {
 	var r : EReg;
