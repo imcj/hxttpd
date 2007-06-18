@@ -29,8 +29,8 @@ import neko.vm.Loader.LoaderHandle;
 			return;
 		}
 
-		//       call cl:mth   constrarg  funcargs
-		trace(m.call("TestModule:function", null, null));
+		//       call class:method          funcargs  constrarg
+		trace(m.call(["TestModule","function"], null, null));
 
 		try {
 			trace(m.call("TestModule:idontexist", null, null));
@@ -39,9 +39,9 @@ import neko.vm.Loader.LoaderHandle;
 
 		trace("Running test function 3 times");
 		var inst = m.createInstance();
-		m.exec(inst, "nice");
-		m.exec(inst, "nice");
-		m.exec(inst, "nice");
+		m.exec(inst, "testfunc");
+		m.exec(inst, "testfunc");
+		m.exec(inst, "testfunc");
 */
 
 class VmLoader {
