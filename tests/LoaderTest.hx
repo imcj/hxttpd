@@ -21,6 +21,14 @@ class LoaderTest {
 		//fromString(str : String) : Array<String>
 		var res = vmm.call(["fromString"], ["bytes=1000-2000"]);
 		trace(here.methodName + " This should say [1000-2000] >> " + Std.string(res));
+
+		// here, is an example where one loader sets a static
+		// class value, and the other loader does not have the
+		// same value set.
+		res = vmm.call(["setStaticMessage"],["Hello again, world."]);
+		trace("myloader " + vmm.call(["getStaticMessage"]));
+		var vmm2 = VmLoader.get("webdoc").getCache().get("Test");
+		trace("webdoc " + vmm2.call(["getStaticMessage"]));
 	}
 
 	static public function main() {

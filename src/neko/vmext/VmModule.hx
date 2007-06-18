@@ -16,7 +16,7 @@ import neko.vm.Loader;
 import neko.vm.Loader.LoaderHandle;
 
 class VmModule {
-	var module(default,null)	: neko.vm.Module;
+	public var module(default,null)	: neko.vm.Module;
 	var name			: String;
 	var filename			: String;
 	var main			: String;

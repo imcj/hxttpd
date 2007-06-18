@@ -1,6 +1,8 @@
 // file Server.hx
 class Test {
+	static var sMsg : String = "Static msg not set";
 	var msg : String;
+
 	public function new() {
 		msg = "Uninitialized message";
 	}
@@ -40,6 +42,14 @@ class Test {
 	public function getMessage() : String {
 		return msg;
 	}
+
+	public static function setStaticMessage(str:String) {
+		sMsg = str;
+	}
+	public static function getStaticMessage() {
+		return sMsg;
+	}
+
 
     static function main() {
 	var r : EReg;
