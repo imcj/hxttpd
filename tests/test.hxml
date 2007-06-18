@@ -4,5 +4,11 @@
 --next
 
 -main TestGmtDate.hx
--x TestGmtDate.n
+-x TestGmtDate
+-cp ../src
+
+--next
+
+-main LoaderTest.hx
+-x LoaderTest
 -cp ../src

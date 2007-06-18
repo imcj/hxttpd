@@ -1,6 +1,22 @@
 // file Server.hx
 class Test {
-        static public function fromString(str : String) : Array<String> {
+	public function new() {}
+        public static function fromString(str : String) : Array<String> {
+                var hranges = new Array<String>();
+                str = StringTools.trim(str);
+                str = StringTools.replace(str," ","");
+                if(str.substr(0,6) != "bytes=")
+                        return hranges;
+                str = str.substr(6);
+                var parts = str.split(",");
+                for(i in parts) {
+                        var r = new String(i);
+                        hranges.push(r);
+                }
+                return hranges;
+        }
+
+        public function fromString2(str : String) : Array<String> {
                 var hranges = new Array<String>();
                 str = StringTools.trim(str);
                 str = StringTools.replace(str," ","");
@@ -42,7 +58,8 @@ class Test {
 	} catch(e:Dynamic) { trace(e); }
 
 	var str = "bytes=0 -   12,14 -34,  -500,  500-";
-	Test.fromString(str);
+	//Test.fromString(str);
+	fromString(str);
 	trace(str);
 	trace(Test.fromString(str));
 	/* 
