@@ -42,28 +42,33 @@ class VmModule {
 
 	/**
 		Checks the classes to see if there is one named the same
-		as the module name, or the return value of main() in the
-		loaded module. This is treated as the "main" class of the
+		as the module name, or the return value of vmmMainClassName()
+		in the loaded module. This is treated as the "main" class of the
 		module, which is then used whenever a method-only call
 		is made via call() or exec()
+		The main class name can also be set by changing the main field
+		manually.
 	*/
 	private function findMain() {
 		main = null;
 		var exp = module.exportsTable().__classes;
 		var nlc = name.toLowerCase();
 		for(i in Reflect.fields(exp)) {
-			//trace(here.methodName+ " class: " + i);
-			if(i == eresult) {
-				main = i;
-				//trace(here.methodName + " Selected " + i + " as main class");
+			var cls = Reflect.field(exp,i);
+			var func = Reflect.field(cls,"vmmMainClassName");
+			if(Reflect.isFunction(func)) {
+				main = Reflect.callMethod(i, func, []);
 				return;
 			}
+
+		}
+		for(i in Reflect.fields(exp)) {
 			if(i.toLowerCase() == nlc) {
 				main = i;
-				//trace(here.methodName + " Selected " + i + " as main class");
 				return;
 			}
 		}
+		trace("Could not locate main class in module "+name);
 	}
 
 	/**

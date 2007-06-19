@@ -6,29 +6,41 @@ enum PluginResponse {
 }
 
 class HttpdPlugin {
-
-	public var version	: String;
 	public var name		: String;
+	public var version	: String;
+
+	// Each of the following fields can be set to a function
+	// to handle that event.
 
 	// parse configuration
-	public var _hConfig		: Dynamic;
+	public var _hConfig			: Dynamic;
 	// interval timer, 1 per second
 	// Server->PluginResponse
-	public var _hInterval		: Dynamic;
+	public var _hInterval			: Dynamic;
 	// app shutdown
-	public var _hCleanup		: Dynamic;
+	public var _hCleanup			: Dynamic;
 
 	// handle raw request
-	public var _hReq		: Dynamic;
+	public var _hReq			: Dynamic;
 	// after the uri has been set
-	public var _hUri		: Dynamic;
+	public var _hUri			: Dynamic;
 	// determine document root
-	public var _hDocroot		: Dynamic;
+	public var _hDocroot			: Dynamic;
 	// determine physical path
-	public var _hTranslated		: Dynamic;
+	public var _hTranslated			: Dynamic;
 	// request complete
-	public var _hReqComplete 	: Dynamic;
+	public var _hReqComplete 		: Dynamic;
 
+	/**
+		Return a string with the name of the main
+		class in the module. This class will be instanced
+		when loading the plugin.
+		Must be overridden.
+	*/
+	public static function vmmMainClassName() : String {
+		throw("Plugin has not implemented vmmMainClassName");
+		return "";
+	}
 
 	public function new() {
 		version = "";
@@ -41,21 +53,5 @@ class HttpdPlugin {
 		_hTranslated = null;
 		_hCleanup = null;
 		_hReqComplete = null;
-	}
-
-	public function init(name:String, version:String) {
-		this.name = name;
-		this.version = version;
-		var lib = "name_"+version;
-
-		_hConfig = try Lib.load(lib,"",1) catch(e : Dynamic) null;
-		_hInterval = try Lib.load(lib,"on_interval",1) catch( e : Dynamic ) null;
-		_hCleanup = try Lib.load(lib,"",1) catch(e : Dynamic) null;
-
-		_hReq = try Lib.load(lib,"",2) catch(e : Dynamic) null;
-		_hUri = try Lib.load(lib,"",2) catch(e : Dynamic) null;
-		_hDocroot = try Lib.load(lib,"",2) catch(e : Dynamic) null;
-		_hTranslated = try Lib.load(lib,"",2) catch(e : Dynamic) null;
-		_hReqComplete = try Lib.load(lib,"",2) catch(e : Dynamic) null;
 	}
 }

@@ -143,6 +143,10 @@ class VmLoader {
 		return cache;
 	}
 
+	public function getPath() {
+		return path;
+	}
+
 	/**
 		Set the search paths for this loader. This
 		erases any previous paths.
@@ -168,12 +172,7 @@ class VmLoader {
 		try {
 			m =  neko.vm.Module.readPath(moduleName+".n", path, ldr);
 		} catch(e:Dynamic) {
-			try {
-				m =  neko.vm.Module.readPath(moduleName+".ndll", path, ldr);
-			}
-			catch(e:Dynamic) {
-				throw("Module not found : "+moduleName);
-			}
+			throw("Module not found : "+moduleName);
 		}
 		return m;
 	}

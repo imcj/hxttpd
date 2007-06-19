@@ -38,6 +38,8 @@ enum ConnectionState {
 
 
 class HttpdClientData {
+	//public var server		: ThreadServer<Connection,String>;
+	public var server(default,null) : HxTTPDTinyServer;
 	public var sock(default,null)	: Socket;
 	public var remote_host		: Host;
 	public var remote_port		: Int;
@@ -46,7 +48,8 @@ class HttpdClientData {
 	private var num_requests	: Int;
 	public var timer		: Int;
 
-	public function new(s:Socket) {
+	public function new(server, s:Socket) {
+		this.server = server;
 		sock = s;
 		state = STATE_WAITING;
 		req = null;

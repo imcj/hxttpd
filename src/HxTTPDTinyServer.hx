@@ -38,10 +38,15 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	var access_loggers			: List<HttpdLogger>;
 	var error_loggers			: List<HttpdLogger>;
 
-	var plugins				: List<HttpdPlugin>;
+	var vmPlugin				: neko.vmext.VmLoader;
+	//var plugins				: List<HttpdPlugin>;
+	var plugins				: List<Dynamic>;
 
 	public function new() {
 		super(onConnect);
+		// parent
+		this.listenCount = 512;
+
 		this.document_root = neko.Sys.getCwd();
 		var r : EReg = ~/\/$/;
 		this.document_root = r.replace(this.document_root, "");
@@ -53,15 +58,56 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		this.connection_timeout = 100;
 		this.data_timeout = 0;
 		this.last_interval = Date.now().getSeconds();
+
 		this.access_loggers = new List();
 		this.error_loggers = new List();
+
+		this.vmPlugin = new neko.vmext.VmLoader();
+		this.vmPlugin.addPath(neko.Sys.getCwd()+"plugins/");
+		neko.Sys.putEnv("NEKOPATH",neko.Sys.getEnv("NEKOPATH")+":"+neko.Sys.getCwd()+"plugins");
 		this.plugins = new List();
 
-		// parent
-		this.listenCount = 512;
+		for(i in parseArgs()) {
+			registerPlugin(i);
+		}
 
 		var h = new HttpdLogger("*", "filename", log_format);
 		access_loggers.add(h);
+	}
+
+	static function usage() {
+		neko.Lib.print("\n\nHXTTP USAGE:\n");
+		neko.Lib.print("hxttpd --docroot=/path/to/html --pluginpath=/path/to/plugins\n\n");
+		neko.Sys.exit(0);
+	}
+	function parseArgs() : Array<String> {
+		var p = new Array<String>();
+		for(i in neko.Sys.args()) {
+			var parts = i.split("=");
+			switch(parts[0]) {
+			case "--docroot":
+				if(!neko.FileSystem.isDirectory(parts[1])) {
+					neko.Lib.println("Document root "+parts[1]+" does not exist");
+					usage();
+				}
+				this.document_root = parts[1];
+			case "--pluginpath":
+				if(!neko.FileSystem.isDirectory(parts[1])) {
+					neko.Lib.println("Document root "+parts[1]+" does not exist");
+					usage();
+				}
+				neko.Sys.putEnv("NEKOPATH",neko.Sys.getEnv("NEKOPATH")+":"+parts[1]);
+			case "--load":
+				if(parts[1] == null) {
+					neko.Lib.println("No plugin specified for --load");
+					usage();
+				}
+				p.push(parts[1]);
+			default:
+				usage();
+			}
+		}
+		return p;
 	}
 
 	override public function run(host : Host, port : Int ) {
@@ -73,6 +119,13 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		trace("HxTTPD Server Version " + SERVER_VERSION + " shutdown");
 	}
 
+	function registerPlugin(name:String) : Bool {
+		var vmm = vmPlugin.loadModule(name);
+		var inst = vmm.createInstance(name);
+		plugins.push(inst);
+		trace("Initialized plugin "+name);
+		return true;
+	}
 	/*
 	override public function onClientDisconnected( d : HttpdClientData ) {
 		trace(here.methodName);
@@ -116,7 +169,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
 
 	public function onConnect(sock:Socket) : HttpdClientData {
-		var cdata = new HttpdClientData(sock);
+		var cdata = new HttpdClientData(this, sock);
 		cdata.remote_port = sock.peer().port;
 
 		//var a : { host : Host, port : Int } = sock.peer();
@@ -148,8 +201,13 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 			return;
 		last_interval = sec;
 		for ( i in plugins ) {
-			if( i._hInterval != null)
-				i._hInterval(this);
+			try {
+				var func = Reflect.field(i, "_hInterval");
+				if (Reflect.isFunction(func)) {
+					Reflect.callMethod(i,func,[this]);
+				}
+			}
+			catch (e:Dynamic) { trace(e); }
 		}
 		for ( i in clients ) {
 			i.timer++;
