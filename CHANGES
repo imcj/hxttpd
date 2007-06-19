@@ -1,4 +1,9 @@
-0.2 - 14 June 2007
+0.2 -
+	19 June 2007
+	Plugin api completed, hooks still need to be added to main server,
+	except for _hInterval, which currently works.
+
+	14 June 2007
 	Handles form content types:
 		application/x-www-form-urlencoded
 		multipart/form-data
