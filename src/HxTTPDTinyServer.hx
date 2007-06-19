@@ -38,6 +38,8 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	var access_loggers			: List<HttpdLogger>;
 	var error_loggers			: List<HttpdLogger>;
 
+	var plugins				: List<HttpdPlugin>;
+
 	public function new() {
 		super(onConnect);
 		this.document_root = neko.Sys.getCwd();
@@ -50,8 +52,11 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		this.keepalive_timeout = 20;
 		this.connection_timeout = 100;
 		this.data_timeout = 0;
-		this.access_loggers = new List();
 		this.last_interval = Date.now().getSeconds();
+		this.access_loggers = new List();
+		this.error_loggers = new List();
+		this.plugins = new List();
+
 		// parent
 		this.listenCount = 512;
 
@@ -142,6 +147,10 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		if(sec == last_interval)
 			return;
 		last_interval = sec;
+		for ( i in plugins ) {
+			if( i._hInterval != null)
+				i._hInterval(this);
+		}
 		for ( i in clients ) {
 			i.timer++;
 			switch(i.state) {

@@ -10,6 +10,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// http://www.cs.columbia.edu/sip/syntax/rfc2068.html
+
 import neko.io.File;
 import neko.io.FileInput;
 import neko.FileSystem;
