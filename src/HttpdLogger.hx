@@ -45,7 +45,7 @@ class HttpdLogger {
 	public function log(d : HttpdClientData) : Void {
 		if(host != "*" && d.req.host != host)
 			return;
-		trace("ACCESSLOG: "+parse(d));
+		neko.Lib.println("ACCESSLOG: "+parse(d));
 	}
 
 	function parse(d : HttpdClientData) : String {
@@ -75,7 +75,7 @@ class HttpdLogger {
 
 		for(s in replace_header) {
 			var r : EReg = new EReg("%{" + s + "}i", "g");
-			var headval = d.req.headers_in.get(s);
+			var headval = d.req.getHeaderIn(s);
 			if(headval == null) headval = "-";
 			msg = r.replace(msg, headval);
 		}

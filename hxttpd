@@ -1,2 +1,2 @@
 #!/bin/sh
-NEKOPATH=/usr/neko/lib:/usr/bin:./bin neko bin/hxttpd.n --docroot=./html --pluginpath=./bin --load=ModTest
+NEKOPATH=/usr/neko/lib:/usr/bin:./bin neko bin/hxttpd.n --docroot=./html --pluginpath=./bin --load=ModNeko --port=8080

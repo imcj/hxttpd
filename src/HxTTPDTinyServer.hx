@@ -18,6 +18,7 @@ import neko.io.File;
 import HttpdRequest.HttpMethod;
 import HttpdRequest.ResponseType;
 import HttpdClientData.ConnectionState;
+import HttpdPlugin.Response;
 
 class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
@@ -77,9 +78,10 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
 	static function usage() {
 		neko.Lib.print("\n\nHXTTP USAGE:\n");
-		neko.Lib.print("hxttpd --docroot=/path/to/html --pluginpath=/path/to/plugins\n\n");
+		neko.Lib.print("hxttpd --docroot=/path/to/html --pluginpath=/path/to/plugins --port=8080\n\n");
 		neko.Sys.exit(0);
 	}
+
 	function parseArgs() : Array<String> {
 		var p = new Array<String>();
 		for(i in neko.Sys.args()) {
@@ -103,6 +105,12 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 					usage();
 				}
 				p.push(parts[1]);
+			case "--port":
+				default_port = Std.parseInt(parts[1]);
+				if(default_port == null || default_port < 1 || default_port > 65535) {
+					neko.Lib.print("Port out of range\n");
+					usage();
+				}
 			default:
 				usage();
 			}
@@ -111,7 +119,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	}
 
 	override public function run(host : Host, port : Int ) {
-		trace("HxTTPD Server Version " + SERVER_VERSION + " starting up on " + host.toString() + ":" + Std.string(port)+" "+ GmtDate.timestamp());
+		neko.Lib.println("HxTTPD Server Version " + SERVER_VERSION + " starting up on " + host.toString() + ":" + Std.string(port)+" "+ GmtDate.timestamp());
 		this.host = host;
 		this.port = port;
 		default_port = port;
@@ -123,23 +131,30 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		var vmm = vmPlugin.loadModule(name);
 		var inst = vmm.createInstance(name);
 		plugins.push(inst);
-		trace("Initialized plugin "+name);
+		neko.Lib.println("Initialized plugin "+name);
 		return true;
 	}
-	/*
+
 	override public function onClientDisconnected( d : HttpdClientData ) {
-		trace(here.methodName);
+		d.sock = null;
 	}
 
+	/*
 	override public function onError( e : Dynamic ) {
 		super.onError(e);
 	}
 	*/
 
 	override public function onInternalError( d : HttpdClientData, e : Dynamic ) {
+		trace(here.methodName);
+		trace(haxe.Stack.toString(haxe.Stack.callStack()));
 		d.setResponse(500);
+		d.req.setMessage(HttpdResponse.codeToHtml(500));
+		d.req.keepalive = false;
 		prepareResponse(d);
 		sendResponse(d);
+		//STATE_CLOSING:
+		closeConnection(d.sock);
 	}
 
 	override public function onClientWritable(  d : HttpdClientData ) {
@@ -232,7 +247,6 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 					closeConnection(i.sock);
 				}
 			case STATE_CLOSING:
-				trace("Error: Interval closing socket that should have closed already");
 				closeConnection(i.sock);
 			}
 		}
@@ -332,6 +346,8 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	}
 
 	function closeConnectionError( d : HttpdClientData) : Void {
+		if(d.req.return_code == 500 && d.sock == null)
+			return;
 		d.req.keepalive = false;
 		var url = d.req.url;
 		if(d.getResponse() == 301)
@@ -392,8 +408,39 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		not be opened.
 	**/
 	function translatePath(d : HttpdClientData) : Bool {
-		// TODO alias directories and such
 		d.req.path_translated = document_root;
+		// hook _hTranslate
+		for ( i in plugins ) {
+			try {
+				var func = Reflect.field(i, "_hTranslate");
+				if (Reflect.isFunction(func)) {
+					var rv : Response = Reflect.callMethod(i,func,[this,d.req]);
+					//trace("Plugin returned "+rv+ " "+Type.typeof(rv));
+					//trace(Type.getEnum(rv));
+					switch(Std.string(rv)) {
+					case "COMPLETE":
+						trace("RETURNING");
+						if(d.req.return_code < 100) {
+							log_error(d,"Module "+i.name+" did not set response code");
+							d.req.return_code = 200;
+						}
+						return true;
+					case "ERROR":
+						onInternalError(d, null);
+						return false;
+					case "SKIP":
+					}
+				}
+			}
+			catch (e:Dynamic) {
+				trace(e);
+				onInternalError(d, e);
+			}
+		}
+
+		if(d.req.return_code == 500)
+			return false;
+
 		var p = d.req.path;
 		d.req.path_translated += p;
 		trace(here.methodName + " final: " + d.req.path_translated);

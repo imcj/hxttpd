@@ -1,5 +1,5 @@
 import neko.Lib;
-enum PluginResponse {
+enum Response {
 	ERROR;
 	SKIP;
 	COMPLETE;
@@ -26,8 +26,9 @@ class HttpdPlugin {
 	public var _hUri			: Dynamic;
 	// determine document root
 	public var _hDocroot			: Dynamic;
-	// determine physical path
-	public var _hTranslated			: Dynamic;
+	// determine physical path. When called, req.path_translated is set
+	// to the document root, and req.path is the uri
+	public var _hTranslate			: Dynamic->Dynamic->Response;
 	// request complete
 	public var _hReqComplete 		: Dynamic;
 
@@ -42,6 +43,33 @@ class HttpdPlugin {
 		return "";
 	}
 
+	public function setRequestField(request:Dynamic, field:String, value:Dynamic) : Void {
+		Reflect.setField(request, field, value);
+	}
+
+	public function getRequestField(request:Dynamic, field:String) {
+		return Reflect.field(request,field);
+	}
+
+	public function setResponseCode(request:Dynamic, code:Int) : Void {
+		Reflect.setField(request, "return_code", code);
+	}
+
+	public function setMessage(request:Dynamic, msg: String) : Void {
+		Reflect.setField(request, "message", msg);
+	}
+
+	public function setResponseHeader(request:Dynamic, key:String, value:String) {
+		trace(here.methodName);
+		try {
+			var func = Reflect.field(request,"addResponseHeader");
+			Reflect.callMethod(request, func,[key,value]);
+		} catch(e:Dynamic) {
+			trace(e);
+			throw e;
+		}
+	}
+
 	public function new() {
 		version = "";
 		name = "";
@@ -50,7 +78,7 @@ class HttpdPlugin {
 		_hReq = null;
 		_hUri = null;
 		_hDocroot = null;
-		_hTranslated = null;
+		_hTranslate = null;
 		_hCleanup = null;
 		_hReqComplete = null;
 	}

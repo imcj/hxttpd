@@ -43,7 +43,8 @@ class HttpdRequest {
 	public var port 				: Int;
 	public var path 				: String;
 	public var path_translated			: String;
-        public var headers_in 				: Hash<String>;
+	public var path_info				: String;
+        public var headers_in 				: List<{ value : String, header : String}>;
 	public var post_data 				: String;
 	public var in_content_type			: String;
 	public var in_content_length			: Int;
@@ -91,7 +92,8 @@ class HttpdRequest {
 		port = 0;
 		path = null;
 		path_translated = null;
-		headers_in = new Hash<String>();
+		path_info = null;
+		headers_in = new List();
 		post_data = null;
 		in_content_type = null;
 		in_content_length = 0;
@@ -119,6 +121,31 @@ class HttpdRequest {
 		ranges = null;
 		multipart = false;
 		keepalive = true;	// HTTP/1.1 Default
+	}
+
+	public function getHeaderIn(key:String) : String {
+		var klc = key.toLowerCase();
+		for(i in headers_in) {
+			if(i.header.toLowerCase() == klc)
+				return i.value;
+		}
+		return null;
+	}
+
+	public function getCookies() : Hash<String> {
+		var ch = new Hash<String>();
+		var p = new Array<String>();
+		for(i in headers_in) {
+			if(i.header.toLowerCase() != "cookie")
+				continue;
+			var pp = i.value.split("; ");
+			p = p.concat(pp);
+		}
+		for(i in p) {
+			var pp = i.split("=");
+			ch.set(pp[0],pp[1]);
+		}
+		return ch;
 	}
 
 	/**
@@ -155,11 +182,9 @@ class HttpdRequest {
 
 	public function setRequestHeader(key : String, val : String) : Bool {
 		// request headers are case insensitive
-		key = key.toLowerCase();
-		//trace(here.methodName + " Key: " + key + " value: " + val, 5);
 		if(key == null || val == null)
 			return true;
-		headers_in.set(key, val);
+		headers_in.push({value:val, header:key});
 
 		key = key.toLowerCase();
 		if(key == "host") {

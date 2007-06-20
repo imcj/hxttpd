@@ -284,9 +284,10 @@ class HttpdServerLoop<ClientData> {
 						readData(cl);
 						processData(cl);
 					} catch( e : Dynamic ) {
-						if( !Std.is(e,neko.io.Eof) )
-							onInternalError(cl.data, e);
-						closeConnection(cl.sock);
+						if( !Std.is(e,neko.io.Eof) ) {
+							//onInternalError(cl.data, e);
+							closeConnection(cl.sock);
+						}
 					}
 				}
 			}

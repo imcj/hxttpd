@@ -29,14 +29,21 @@ class VmModule {
 		and the module name. Module name does not include
 		the .n or .ndll
 	*/
-	public function new(m:neko.vm.Module, name:String) {
+	public function new(m:neko.vm.Module, name:String, ?noexec:Bool) {
 		module = m;
-		this.name = name;
+		var parts = name.split("/");
+		this.name = parts.pop();
 		filename = m.name();
 		main = null;
-		eresult = m.execute();
-		size = m.codeSize();
 		instances = new Hash();
+		if(noexec == true)
+			return;
+		execute();
+	}
+
+	public function execute() {
+		eresult = module.execute();
+		size = module.codeSize();
 		findMain();
 	}
 
@@ -50,6 +57,7 @@ class VmModule {
 		manually.
 	*/
 	private function findMain() {
+		//trace(here.methodName);
 		main = null;
 		var exp = module.exportsTable().__classes;
 		var nlc = name.toLowerCase();

@@ -14,6 +14,7 @@ package neko.vmext;
 import neko.vm.Module;
 import neko.vm.Loader;
 import neko.vm.Loader.LoaderHandle;
+import Type;
 /**
 	VmLoader wraps the module management of neko, with a custom
 	loader class and a custom VmModule class.
@@ -55,8 +56,9 @@ class VmLoader {
 		Create a new loader.
 		Default path is taken from the system defaults
 	*/
-	public function new(?ldrName : String) {
-		ldr = neko.vm.Loader.make(_loadPrim, _loadMod);
+	public function new(?ldrName : String, ?primLdr:Dynamic, ?modLdr:Dynamic) {
+		primLdr = if(Type.typeof(primLdr) == ValueType.TFunction) primLdr else _loadPrim;
+		ldr = neko.vm.Loader.make(primLdr, _loadMod);
 		path = neko.vm.Loader.local().getPath();
 		cache = new Hash();
 		if(ldrName != null) {
@@ -115,11 +117,14 @@ class VmLoader {
 	/**
 		Load a module. Unlike neko.vm.Loader, the module
 		is initialized when it is loaded.
+		If you do not want the module to execute immediately,
+		set the noexec to true.
 	*/
-	public function loadModule(moduleName:String) : VmModule {
+	public function loadModule(moduleName:String,?noexec:Bool) : VmModule {
 		var m = _loadMod(moduleName);
-		var vmm = new VmModule(m, moduleName);
-		// won't run if something above throws
+		if(m == null)
+			throw "Unable to load module "+moduleName;
+		var vmm = new VmModule(m, moduleName,noexec);
 		cache.set(moduleName, vmm);
 		return vmm;
 	}

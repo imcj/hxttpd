@@ -1,6 +1,6 @@
 CC=gcc
 PLUGINS=mod_test.ndll
-PLUGINS_HAXE=ModTest.n
+PLUGINS_HAXE=ModTest.n ModNeko.n
 #Mod_Test.n
 LIBPATH=
 INCPATH=-I /usr/include/neko
@@ -14,11 +14,14 @@ all: $(PLUGINS) $(PLUGINS_HAXE) install
 %.o: %.c
 	$(CC) -Wfatal-errors -c $(INCPATH) -Wall -o $@ $<
 
-%.n: %.hx
-	haxe -cp ../src -neko $@ $<
+#%.n: %.hx
+#	haxe -cp ../src -neko $@ $<
 
 ModTest.n:
-	haxe -cp ../src -neko ModTest.n ModTest.hx
+	haxe -cp ../src -neko ModTest.n -main ModTest ModTest.hx
+
+ModNeko.n:
+	haxe -cp ../src -neko ModNeko.n -main ModNeko ModNeko.hx
 
 install:
 	@mv *.ndll ../bin

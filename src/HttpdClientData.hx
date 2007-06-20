@@ -40,7 +40,7 @@ enum ConnectionState {
 class HttpdClientData {
 	//public var server		: ThreadServer<Connection,String>;
 	public var server(default,null) : HxTTPDTinyServer;
-	public var sock(default,null)	: Socket;
+	public var sock			: Socket;
 	public var remote_host		: Host;
 	public var remote_port		: Int;
 	public var state 		: ConnectionState;

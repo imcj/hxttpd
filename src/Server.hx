@@ -16,7 +16,7 @@ class Server {
 	static function main() {
 		var s = new HxTTPDTinyServer();
 		s.keepalive_enabled = true;
-		s.run(new neko.net.Host(HOST), PORT);
+		s.run(new neko.net.Host(HOST), HxTTPDTinyServer.default_port);
 		trace("Server did not run");
 	}
 }
