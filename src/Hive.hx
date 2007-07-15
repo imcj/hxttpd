@@ -1,17 +1,29 @@
+// Copyright 2007, Russell Weir
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// http://www.apache.org/licenses/LICENSE-2.0
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 
 typedef VarList = {
 	key: String,
 	value: String
 }
-
+import haxe.Stack;
 
 class Hive {
-	//public var neko : ModNeko;
 	public static var Request	: Dynamic 	= null;
 	public static var Response	: Dynamic	= null;
 	public static var _ENV		: Hash<Dynamic> = null;
 	public static var _GET		: Hash<Dynamic> = null;
 	public static var _POST 	: Hash<Dynamic> = null;
+	public static var _GETPOST	: Hash<Dynamic> = null;
 	public static var _COOKIE	: Hash<Dynamic> = null;
 	public static var _SERVER	: Hash<Dynamic> = null;
 	public static var _REQUEST	: Hash<Dynamic> = null;
@@ -27,6 +39,7 @@ class Hive {
 			Hive.Request = req.getMainModuleRequest();
 			Hive.Response = resp.getMainModuleResponse();
 		}
+
 		var pv : Array<{key: String,value: String}>;
 
 		_ENV = new Hash<Dynamic>();
@@ -47,6 +60,9 @@ class Hive {
 			_POST = Hive.makeHashFromSpec(i.key,i.value,_POST);
 
 		_COOKIE = new Hash<Dynamic>();
+		var cv : Array<HttpCookie> = Request.getCookies();
+		for(i in cv)
+			_COOKIE = Hive.makeHashFromSpec(i.getName(), i.getValue(),_COOKIE);
 
 		_SERVER = new Hash<Dynamic>();
 		/*
@@ -56,15 +72,45 @@ class Hive {
 		*/
 
 		_REQUEST = mergeEnv(["E","G","P","C","S"]);
+		_GETPOST = mergeEnv(["G","P"]);
 		_FILES = Request.file_vars;
 	}
 
-	public function err(msg, ?stack) {
+	public static function err(msg, ?stack:Array<haxe.StackItem>) {
 		print(msg);
+		print("<br>\n");
 		if(stack != null) {
-			//for(i in stack)
-			//	print(i);
-			print(stack.toString());
+			// remove Hive
+			stack.pop();
+			var b = new StringBuf();
+			var foundEntry = false;
+			for(i in stack) {
+				switch( i ) {
+                        	case CFunction:
+					foundEntry = true;
+                        	case Module(m):
+					if(foundEntry) {
+                                		b.add("module ");
+                                		b.add(m);
+						b.add("<br>\n");
+					}
+                        	case FilePos(name,line):
+					if(foundEntry) {
+                                		b.add(name);
+                                		b.add(" line ");
+                                		b.add(line);
+						b.add("<br>\n");
+					}
+                        	case Method(cname,meth):
+					if(foundEntry) {
+        	                        	b.add(cname);
+                	                	b.add(" method ");
+                        	        	b.add(meth);
+						b.add("<br>\n");
+					}
+                        	}
+			}
+			print(b.toString());
 		}
 		neko.Sys.exit(1);
 	}
@@ -76,17 +122,23 @@ class Hive {
 		Response.setCookie(cookie);
 	}
 
-	public function println(s:String) {
-		neko.Lib.println(s);
-	}
 
-	public function print(s:String) {
-		neko.Lib.print(s);
-	}
 
 	///////////////////////////////////////////////////////////////////////////
 	//                     STATIC METHODS                                    //
 	///////////////////////////////////////////////////////////////////////////
+	public static function println(s:String) {
+		neko.Lib.println(s);
+	}
+
+	public static function print(s:String) {
+		neko.Lib.print(s);
+	}
+
+	public static function exit() {
+		neko.Sys.exit(1);
+	}
+
 	public static function parseVars(s:String) : Hash<Dynamic> {
 		var rv = new Hash<Dynamic>();
 		var args = s.split("&");
@@ -211,32 +263,133 @@ class Hive {
 		}
 		return rv;
 	}
-/*
-	public function setReturnCode(r:Int) : Void {}
-	public function setHeader(h : String, v : String) : Void {}
-	public function setCookie(k : String, v : String) : Void {}
-	//public function redirect(url : String) : Void {}
-	public function parseMultipart(onPart : (String -> String -> Void), onData : (String -> Int -> Int -> Void)) : Void {}
-	public function isModNeko() : Bool { return true; }
-	public function getURI(Void) : String { return ""; }
-	public function getPostData(Void) : String { return ""; }
-	public function getParamsString(Void) : String { return ""; }
-	public function getParams(Void) : Hash<String> { return new Hash<String>(); }
-	public function getParamValues(param : String) : Array<String> { return new Array<String>(); }
-	public function getMultipart(maxSize : Int) : Hash<String> { return new Hash<String>(); }
-	public function getHostName() : String {return "";}
-	public function getCwd(Void) : String {return "";}
-	public function getCookies() : Hash<String> {return new Hash<String>();}
-	public function getClientIP() : String {return "";}
-	public function getClientHeaders() : List<{ value : String, header : String }> { return new List<{ value : String, header : String }>();}
-	public function getClientHeader(k : String) : String {return "";}
-	public function getAuthorization() : { user : String, pass : String } {
+
+	///////////////////////////////////////////////////////////////////////////
+	//                  neko.Web COMPAT STATIC METHODS                       //
+	///////////////////////////////////////////////////////////////////////////
+	public static function setReturnCode(r:Int) : Void {
+		Response.setStatus(r);
+	}
+
+	public static function setHeader(h : String, v : String) : Void {
+		if(Response.headers_sent)
+			err("Headers already sent", haxe.Stack.callStack());
+		Response.setHeader(h, v);
+	}
+
+	public static function setCookie(k : String, v : String) : Void {
+		var c = new HttpCookie(k,v);
+		Response.cookies.add(c);
+	}
+
+	public static function redirect(url : String) : Void {
+		setHeader("Location", url);
+		setReturnCode(302);
+	}
+	//public static function parseMultipart(onPart : (String -> String -> Void), onData : (String -> Int -> Int -> Void)) : Void {}
+	public static function isModNeko() : Bool { return false; }
+	public static function getURI(Void) : String { return Request.url; }
+	public static function getPostData(Void) : String { return Request.post_vars; }
+	//TODO
+	public static function getParamsString(Void) : String { return ""; }
+	//TODO
+	public static function getParams(Void) : Hash<String> { return new Hash<String>(); }
+	//TODO
+	public static function getParamValues(param : String) : Array<String> {
+		return new Array<String>();
+	}
+	//TODO
+	public static function getMultipart(maxSize : Int) : Hash<String> {
+		return new Hash<String>();
+	}
+	public static function getHostName() : String {
+		return Std.string(Request.host);
+	}
+	public static function getCwd(Void) : String {
+		var p : String = Request.path_translated;
+		if(Request.path.charAt(0) != "/")
+			p = p + "/";
+		p = p + Request.path;
+		p = p.substr(0,p.lastIndexOf("/"));
+		return p;
+	}
+	public static function getCookies() : Hash<String> {
+		var rv = new Hash<String>();
+		var cv : Array<HttpCookie> = Request.getCookies();
+		for(i in cv)
+			rv.set(i.getName(), i.getValue());
+		return rv;
+	}
+	public static function getClientIP() : String {
+		return Request.client.remote_host.toString();
+	}
+	public static function getClientHeaders() : List<{ value : String, header : String }> {
+		var rv = new List<{ value : String, header : String }>();
+		var h : List<{key: String,value: String}> = Request.headers_in;
+		for(i in h) {
+			rv.add({value:i.value,header:i.key});
+		}
+		return rv;
+	}
+	public static function getClientHeader(k : String) : String {
+		return Request.getHeaderIn(k);
+	}
+	public static function getAuthorization() : { user : String, pass : String } {
 		var t = { user:"Me",pass:"me"};
 		return t;
 	}
-	public function flush() : Void {}
-	public function cacheModule(f : (Void -> Void)) : Void {}
-*/
+	public static function flush() : Void {
+		//trace("THREAD ID:" + Reflect.field(thread,"id"));
+		send_message(HiveThreadMessage.FLUSH);
+	}
+	public static function cacheModule(f : (Void -> Void)) : Void {}
+
+
+	///////////////////////////////////////////////////////////////////////////
+	//                  FORM HANDLING STATIC METHODS                         //
+	///////////////////////////////////////////////////////////////////////////
+
+	/**
+		Check if an html checkbox is set
+		Either specify the source (_POST or _GET vars), or the
+		default merged environment GP will be used.
+	*/
+	public static function formIsChecked(name:String, ?source:Hash<Dynamic>) : Bool {
+		if(source == null)
+			source = _GETPOST;
+		return if(source.get(name) == "on") true; else false;
+	}
+
+	/**
+		Return text from form field. If field does not exist,
+		returns empty string. If field is a hash, it will be
+		converted to a string.
+	*/
+	public static function formField(name:String, ?source:Hash<Dynamic>) :String {
+		if(source == null)
+			source = _GETPOST;
+		if(!source.exists(name))
+			return "";
+		if(Type.getClassName(Type.getClass(source.get(name))) == "Hash")
+			return(source.get(name).toString());
+		return source.get(name);
+	}
+
+	/**
+		Return a form Hash. If field does not exist, or is not a
+		hash, will return null.
+	*/
+	public static function formHash(name:String, ?source:Hash<Dynamic>) : Hash<Dynamic> {
+		if(source == null)
+			source = _GETPOST;
+		if(!source.exists(name))
+			return null;
+		if(Type.getClassName(Type.getClass(source.get(name))) != "Hash")
+			return null;
+		return source.get(name);
+	}
+
+	static var send_message = neko.Lib.load("hive","send_message",1);
 }
 
 

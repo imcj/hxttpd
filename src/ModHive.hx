@@ -1,3 +1,15 @@
+// Copyright 2007, Russell Weir
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// http://www.apache.org/licenses/LICENSE-2.0
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import ThreadExtra;
 
 private class ThreadInfo implements Dynamic {
@@ -47,6 +59,13 @@ private class ThreadInfo implements Dynamic {
 		moduleName = null;
 		filedate = null;
 		l.release();
+	}
+
+	public function flush() {
+		if(!response.headers_sent) {
+			response.startChunkedResponse();
+		}
+		flushbuffer();
 	}
 
 	public function flushbuffer() {
@@ -100,14 +119,16 @@ private class ThreadInfo implements Dynamic {
 }
 
 
-
+/*
 enum WorkerMsgType {
 SHUTDOWN;
+FLUSH;
 }
+*/
 
 typedef ClientThreadMsg = {
 	id : Int,
-	msg : WorkerMsgType
+	msg : Int
 }
 
 
@@ -146,7 +167,7 @@ class ModHive extends HttpdPlugin {
 	public function new() {
 		super();
 		name = "ModHive";
-		version = "0.2";
+		version = "0.3";
 
 		//threads = new Array();
 		nthreads = 0;
@@ -298,11 +319,13 @@ class ModHive extends HttpdPlugin {
 
 	function runWorker() {
 		while( true ) {
-			var m : ClientThreadMsg = ThreadExtra.readMessage(true);
-			switch(m.msg) {
-			case SHUTDOWN:
-				threads[m.id].init();
-			}
+ 			var m : ClientThreadMsg = ThreadExtra.readMessage(true);
+ 			switch(m.msg) {
+ 			case HiveThreadMessage.SHUTDOWN:
+ 				threads[m.id].init();
+ 			case HiveThreadMessage.FLUSH:
+ 				threads[m.id].flush();
+ 			}
 		}
 	}
 
@@ -332,11 +355,11 @@ trace(2);
 		ti.response.setHeader("Expires","Thu, 19 Nov 1981 08:52:00 GMT");
 		ti.response.setHeader("Cache-Control","no-store, no-cache, must-revalidate, post-check=0, pre-check=0");
 		ti.response.setHeader("Pragma","no-cache");
-		ti.response.setHeader("X-ModHive", "0.2");
+		ti.response.setHeader("X-ModHive", version);
 
 
 		var nekoSysExit = function(code:Int) {
-			trace("Thread "+ThreadExtra.current()+ " called exit");
+			//trace("Thread "+ThreadExtra.current()+ " called exit");
 			var idx = ModHive.findThread(ThreadExtra.current());
 			//var ti : ThreadInfo = ModHive.findThread(ThreadExtra.current());
 			if(idx >= 0) {
@@ -349,11 +372,18 @@ trace(2);
 				} catch(e:Dynamic) {}
 				threads[idx].print_redirect(null);
 				threads[idx].request.setClientState(HttpdClientData.STATE_CLOSING);
-				worker.sendMessage({ id : idx, msg : SHUTDOWN });
+				worker.sendMessage({ id : idx, msg : HiveThreadMessage.SHUTDOWN });
 			}
 			ThreadExtra.exit();
 		}
 
+		var hiveSendMessage = function(mesg:Dynamic) : Void {
+			//trace("Thread "+ThreadExtra.current()+ " called sendMessage");
+			var idx = ModHive.findThread(ThreadExtra.current());
+			if(idx >= 0) {
+				worker.sendMessage({ id: idx, msg: mesg});
+			}
+		}
 
 		// retrieve the loader for this module
 		var vml : neko.vmext.VmLoader;
@@ -373,6 +403,13 @@ trace(2);
 			if(l == 12) {
 				if(spec == "std@sys_exit") {
 					var f = nekoSysExit;
+					return f;
+				}
+
+			}
+			if(l == 17) {
+				if(spec == "hive@send_message") {
+					var f = hiveSendMessage;
 					return f;
 				}
 			}
@@ -408,7 +445,7 @@ trace(2);
 				//print_redirect(null);
 				lock.release();
 				ti.internalError("Module not found",e);
-				worker.sendMessage({ id : ti.id, msg : SHUTDOWN });
+				worker.sendMessage({ id : ti.id, msg : HiveThreadMessage.SHUTDOWN });
 				return;
 			}
 		}
@@ -430,7 +467,7 @@ trace(2);
 			lock.release();
 			trace(e);
 			ti.internalError(e);
-			worker.sendMessage({ id : ti.id, msg : SHUTDOWN });
+			worker.sendMessage({ id : ti.id, msg : HiveThreadMessage.SHUTDOWN });
 			return;
 		}
 		lock.release();
@@ -474,7 +511,6 @@ trace(2);
 //trace(ti.response.status);
 			//vmm.exec(inst,method,args);
 			rv = vmm.exec(inst,method,[ti.request,ti.response]);
-			//rv = vmm.exec(inst,method,[ti.request,new HttpdRange("bytes=0-1")]);
 		}
 		catch(e:Dynamic) {
 			if(!ti.response.headers_sent) {
@@ -484,15 +520,14 @@ trace(2);
 			finalize();
 			ti.request.setClientState(HttpdClientData.STATE_CLOSING);
 			trace(here.methodName + " rv: "+rv + " e: "+e);
-			worker.sendMessage({ id : ti.id, msg : SHUTDOWN });
+			worker.sendMessage({ id : ti.id, msg : HiveThreadMessage.SHUTDOWN });
 			return;
 		}
 
 
 		finalize();
 		ti.request.setClientState(HttpdClientData.STATE_CLOSING);
-//trace(ti.request.client.state);
-		worker.sendMessage({ id : ti.id, msg : SHUTDOWN });
+		worker.sendMessage({ id : ti.id, msg : HiveThreadMessage.SHUTDOWN });
 		return;
 	}
 }
