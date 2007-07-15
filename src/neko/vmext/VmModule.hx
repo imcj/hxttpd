@@ -16,13 +16,14 @@ import neko.vm.Loader;
 import neko.vm.Loader.LoaderHandle;
 
 class VmModule {
-	public var module(default,null)	: neko.vm.Module;
-	var name			: String;
-	var filename			: String;
-	var main			: String;
-	var eresult			: Dynamic;
-	var size			: Int;
-	var instances			: Hash<Dynamic>;
+	public var module(default,null)		: neko.vm.Module;
+	public var name(default,null)		: String;
+	var filename				: String;
+	var main				: String;
+	var eresult				: Dynamic;
+	var size				: Int;
+	var instances				: Hash<Dynamic>;
+	public var timestamp(default,null)	: Date;
 
 	/**
 		Create a new VmModule from an existing neko.vm.Module
@@ -31,6 +32,7 @@ class VmModule {
 	*/
 	public function new(m:neko.vm.Module, name:String, ?noexec:Bool) {
 		module = m;
+		timestamp = Date.now();
 		var parts = name.split("/");
 		this.name = parts.pop();
 		filename = m.name();
@@ -97,11 +99,15 @@ class VmModule {
 	*/
 	public function createInstance(?className:String, ?constructArgs:Array<Dynamic>) : Dynamic {
 		className = checkClassName(className);
-		if(constructArgs == null)
+		//trace(here.methodName + " ClassName:" + className);
+		if(constructArgs == null) {
 			constructArgs = new Array<Dynamic>();
+		}
+
 		var classes : Dynamic = module.exportsTable().__classes;
-		var c : Class<Dynamic> = Reflect.field(classes, className);
-		var inst = Type.createInstance(c,constructArgs);
+		var cl : Class<Dynamic> = Reflect.field(classes, className);
+		var inst = Type.createInstance(cl,constructArgs);
+
 		return inst;
 	}
 
@@ -131,8 +137,8 @@ class VmModule {
 	*/
 	public function getInstance(instanceName:String,?className:String) : Dynamic {
 		var inst = instances.get(checkClassName(className) + ":" + instanceName);
-		if( inst == null)
-			throw "Instance "+checkClassName(className) + ":" + instanceName+ " does not exist";
+		//if( inst == null)
+		//	throw "Instance "+checkClassName(className) + ":" + instanceName+ " does not exist";
 		return inst;
 	}
 
@@ -148,7 +154,7 @@ class VmModule {
 
 
 	/**
-		Call a method in a class using the syntax [class:]method
+		Call a method in a class using the syntax [[class],method]
 	*/
 	public function call(classMethod:Array<String>, ?args:Array<Dynamic>, ?constructArgs:Array<Dynamic> ) : Dynamic {
 		var nClass,nMethod : String;
@@ -166,12 +172,7 @@ class VmModule {
 		if(args == null)
 			args = new Array<Dynamic>();
 
-		//trace(here.methodName+" class: "+nClass+" method: "+nMethod);
-
-		var classes : Dynamic = module.exportsTable().__classes;
-		var c : Class<Dynamic> = Reflect.field(classes, nClass);
 		var inst = createInstance(nClass, constructArgs);
-
 		return exec(inst, nMethod, args);
 	}
 

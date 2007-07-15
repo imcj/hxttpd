@@ -59,6 +59,10 @@ class VmLoader {
 	public function new(?ldrName : String, ?primLdr:Dynamic, ?modLdr:Dynamic) {
 		primLdr = if(Type.typeof(primLdr) == ValueType.TFunction) primLdr else _loadPrim;
 		ldr = neko.vm.Loader.make(primLdr, _loadMod);
+		// for compatibility with neko.Web
+		untyped ldr.l.args = untyped __dollar__array();
+
+		//ldr = neko.vm.Loader.make(_loadPrim, _loadMod);
 		path = neko.vm.Loader.local().getPath();
 		cache = new Hash();
 		if(ldrName != null) {
@@ -73,6 +77,8 @@ class VmLoader {
 		Register global loader
 	*/
 	public static function register(vml:VmLoader, name : String) {
+		if(vmLoaders.get(name) != null)
+			throw("Attempt to register existing loader "+name);
 		vmLoaders.set(name, vml);
 	}
 
@@ -133,8 +139,8 @@ class VmLoader {
 		Cache control the same as neko.vm.Loader
 	*/
 	public function backupCache( c : Dynamic ) : Dynamic {
-		var old = untyped cache;
-		untyped cache = c;
+		var old = cache;
+		cache = c;
 		return old;
         }
 
@@ -142,7 +148,7 @@ class VmLoader {
 		Cache
 		var m = neko.vm.Loader.local().getCache().get(moduleName);
 		would be:
-		var vmm = neko.vmext.VmLoader.getByName("myloader").getCache().get(moduleName);
+		var vmm = neko.vmext.VmLoader.get("myloader").getCache().get(moduleName);
 	*/
 	public function getCache() {
 		return cache;
@@ -166,7 +172,7 @@ class VmLoader {
 	// neko loader.
 	/////////////////////////////////////////////////////////////
 	public function _loadPrim(spec:String, args:Int) : Dynamic {
-		//trace(here.methodName + " "+spec+" "+args);
+		// trace(here.methodName + " "+spec+" "+args);
 		return neko.vm.Loader.local().loadPrimitive(spec, args);
 	}
 
