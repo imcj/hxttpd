@@ -1,9 +1,8 @@
 CC=gcc
 PLUGINS=mod_test.ndll
-PLUGINS_HAXE=ModTest.n ModNeko.n
-#Mod_Test.n
+PLUGINS_HAXE=ModTest.n 
 LIBPATH=
-INCPATH=-I /usr/include/neko
+INCPATH=-I ./ -I /usr/include/neko
 LIBS=-lneko
 
 all: $(PLUGINS) $(PLUGINS_HAXE) install
@@ -19,9 +18,6 @@ all: $(PLUGINS) $(PLUGINS_HAXE) install
 
 ModTest.n:
 	haxe -cp ../src -neko ModTest.n -main ModTest ModTest.hx
-
-ModNeko.n:
-	haxe -cp ../src -neko ModNeko.n -main ModNeko ModNeko.hx
 
 install:
 	@mv *.ndll ../bin
