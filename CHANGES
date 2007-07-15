@@ -1,3 +1,13 @@
+0.3 -
+	13 July 2007
+	Multipart forms finished
+	neko.Web completed
+		Multipart data works.
+		Modules recompiled in html directories are reloaded without restarting server.
+		flush() currently does not work
+		attempts to set headers after data sent does not fail, but should.
+	ModNeko is automatically loaded if not specified, and ModServlet is not loaded
+
 0.2 -
 	19 June 2007
 	Plugin api completed, hooks still need to be added to main server,
