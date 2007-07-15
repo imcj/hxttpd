@@ -413,6 +413,9 @@ trace(2);
 					return f;
 				}
 			}
+			if(spec.indexOf("encodeURIComponent")>=0) {
+				trace(spec);
+			}
 			if(l > 9 && spec.substr(0,9) == 'mod_neko@') {
 				neko.Lib.println("*********   Module tried to load mod_neko");
 				return null;

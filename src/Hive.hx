@@ -74,15 +74,32 @@ class Hive {
 		_REQUEST = mergeEnv(["E","G","P","C","S"]);
 		_GETPOST = mergeEnv(["G","P"]);
 		_FILES = Request.file_vars;
+
+		try {
+			entryPoint();
+		}
+		catch(e:Dynamic) {
+			err(e, null, haxe.Stack.exceptionStack());
+		}
 	}
 
-	public static function err(msg, ?stack:Array<haxe.StackItem>) {
-		print(msg);
-		print("<br>\n");
+	public function entryPoint() : Void {
+		throw "entryPoint not overridden";
+	}
+
+	public static function err(msg, ?stack:Array<haxe.StackItem>,?exception:Array<haxe.StackItem>) {
+		printbr("");
+		println("<hr>");
+		println("<h1>ERROR: " + Std.string(msg)+"</h1>");
+		println("<hr>");
 		if(stack != null) {
-			// remove Hive
-			stack.pop();
-			var b = new StringBuf();
+			println("<h2>Call stack</h2>");
+			// remove ModHive
+			//stack.shift();
+			//remove VmModule
+			//stack.shift();
+			//remove Reflect
+			//stack.shift();
 			var foundEntry = false;
 			for(i in stack) {
 				switch( i ) {
@@ -90,54 +107,220 @@ class Hive {
 					foundEntry = true;
                         	case Module(m):
 					if(foundEntry) {
-                                		b.add("module ");
-                                		b.add(m);
-						b.add("<br>\n");
+                                		print("module ");
+                                		printbr(m);
 					}
                         	case FilePos(name,line):
 					if(foundEntry) {
-                                		b.add(name);
-                                		b.add(" line ");
-                                		b.add(line);
-						b.add("<br>\n");
+                                		print(name);
+                                		print(" line ");
+                                		printbr(line);
 					}
                         	case Method(cname,meth):
 					if(foundEntry) {
-        	                        	b.add(cname);
-                	                	b.add(" method ");
-                        	        	b.add(meth);
-						b.add("<br>\n");
+        	                        	print(cname);
+                	                	print(" method ");
+                        	        	printbr(meth);
 					}
                         	}
 			}
-			print(b.toString());
+		}
+		if(exception != null) {
+
+			println("<h2>Exception stack</h2>");
+
+			var foundEntry = true;
+			for(i in exception) {
+				switch( i ) {
+                        	case CFunction:
+					printbr("[.dll]");
+                        	case Module(m):
+					if(foundEntry) {
+                                		print("module ");
+                                		printbr(m);
+					}
+                        	case FilePos(name,line):
+					if(foundEntry) {
+                                		print(name);
+                                		print(" line ");
+                                		printbr(line);
+					}
+                        	case Method(cname,meth):
+					if(foundEntry) {
+        	                        	print(cname);
+                	                	print(" method ");
+                        	        	printbr(meth);
+					}
+                        	}
+			}
 		}
 		neko.Sys.exit(1);
 	}
 
-	public function setCookie(cookie : HttpCookie) {
-		if(Response.headers_sent) {
-			err("Headers already sent", haxe.Stack.callStack());
-		}
-		Response.setCookie(cookie);
-	}
+
 
 
 
 	///////////////////////////////////////////////////////////////////////////
 	//                     STATIC METHODS                                    //
 	///////////////////////////////////////////////////////////////////////////
-	public static function println(s:String) {
-		neko.Lib.println(s);
+	public static function print(s:Dynamic) {
+		//neko.Lib.print(s);
+		untyped __dollar__print(s);
 	}
 
-	public static function print(s:String) {
-		neko.Lib.print(s);
+	public static function println(s:Dynamic) {
+		//neko.Lib.println(s);
+		untyped __dollar__print(s,"\n");
+	}
+
+	public static function printbr(s:Dynamic) {
+		//neko.Lib.print(s);
+		//neko.Lib.print("<br>\n");
+		untyped __dollar__print(s, "<br>\n");
 	}
 
 	public static function exit() {
 		neko.Sys.exit(1);
 	}
+
+	// convenience
+	public static function urlEncode( s : String ) : String {
+		//return untyped encodeURIComponents(s);
+		return StringTools.urlEncode(s);
+	}
+	public static function urlDecode( s : String ) : String {
+		//return untyped decodeURIComponents(s.split("+").join(" "));
+		return StringTools.urlDecode(s);
+	}
+	public static function htmlEscape( s : String ) : String {
+		return StringTools.htmlEscape(s);
+	}
+	public static function htmlUnescape( s : String ) : String {
+		return StringTools.htmlUnescape(s);
+	}
+	public static function urlEncodedToHtml( s : String ) : String {
+		return htmlEscape(
+			Hive.urlDecode(s));
+	}
+
+	///////////////////////////////////////////////////////////////////////////
+	//                  neko.Web COMPAT STATIC METHODS                       //
+	///////////////////////////////////////////////////////////////////////////
+	public static function setReturnCode(r:Int) : Void {
+		Response.setStatus(r);
+	}
+
+	public static function setHeader(h : String, v : String) : Void {
+		if(Response.headers_sent)
+			err("Headers already sent", haxe.Stack.callStack());
+		Response.setHeader(h, v);
+	}
+
+	public static function setCookie(cookie : HttpCookie) {
+		if(Response.headers_sent) {
+			err("Headers already sent", haxe.Stack.callStack());
+		}
+		Response.setCookie(cookie);
+	}
+
+	public static function redirect(url : String) : Void {
+		setHeader("Location", url);
+		setReturnCode(302);
+	}
+	public static function getURI(Void) : String { return Request.url; }
+	public static function getPostData(Void) : String { return Request.post_data; }
+	public static function getParamsString(Void) : String { return Request.args; }
+	public static function getParams(Void) : Hash<Dynamic> { return _GET; }
+	public static function getParamValues(param : String) : Dynamic {
+		return _GET.get(param);
+	}
+	public static function getHostName() : String {
+		return Std.string(Request.host);
+	}
+	public static function getCwd(Void) : String {
+		var p : String = Request.path_translated;
+		if(Request.path.charAt(0) != "/")
+			p = p + "/";
+		p = p + Request.path;
+		p = p.substr(0,p.lastIndexOf("/"));
+		return p;
+	}
+	public static function getCookies() : Hash<String> {
+		var rv = new Hash<String>();
+		var cv : Array<HttpCookie> = Request.getCookies();
+		for(i in cv)
+			rv.set(i.getName(), i.getValue());
+		return rv;
+	}
+	public static function getClientIP() : String {
+		return Request.client.remote_host.toString();
+	}
+	public static function getClientHeaders() : List<{ value : String, header : String }> {
+		var rv = new List<{ value : String, header : String }>();
+		var h : List<{key: String,value: String}> = Request.headers_in;
+		for(i in h) {
+			rv.add({value:i.value,header:i.key});
+		}
+		return rv;
+	}
+	public static function getClientHeader(k : String) : String {
+		return Request.getHeaderIn(k);
+	}
+	//TODO
+	public static function getAuthorization() : { user : String, pass : String } {
+		var t = { user:"Me",pass:"me"};
+		return t;
+	}
+	public static function flush() : Void {
+		send_message(HiveThreadMessage.FLUSH);
+	}
+
+
+	///////////////////////////////////////////////////////////////////////////
+	//                  FORM HANDLING STATIC METHODS                         //
+	///////////////////////////////////////////////////////////////////////////
+
+	/**
+		Check if an html checkbox is set
+		Either specify the source (_POST or _GET vars), or the
+		default merged environment GP will be used.
+	*/
+	public static function formIsChecked(name:String, ?source:Hash<Dynamic>) : Bool {
+		if(source == null)
+			source = _GETPOST;
+		return if(source.get(name) == "on") true; else false;
+	}
+
+	/**
+		Return text from form field. If field does not exist,
+		returns empty string. If field is a hash, it will be
+		converted to a string.
+	*/
+	public static function formField(name:String, ?source:Hash<Dynamic>) :String {
+		if(source == null)
+			source = _GETPOST;
+		if(!source.exists(name))
+			return "";
+		if(Type.getClassName(Type.getClass(source.get(name))) == "Hash")
+			return(source.get(name).toString());
+		return source.get(name);
+	}
+
+	/**
+		Return a form Hash. If field does not exist, or is not a
+		hash, will return null.
+	*/
+	public static function formHash(name:String, ?source:Hash<Dynamic>) : Hash<Dynamic> {
+		if(source == null)
+			source = _GETPOST;
+		if(!source.exists(name))
+			return null;
+		if(Type.getClassName(Type.getClass(source.get(name))) != "Hash")
+			return null;
+		return source.get(name);
+	}
+
 
 	public static function parseVars(s:String) : Hash<Dynamic> {
 		var rv = new Hash<Dynamic>();
@@ -152,6 +335,10 @@ class Hive {
 		return rv;
 	}
 
+
+	///////////////////////////////////////////////////////////////////////////
+	//                      UTILITY STATIC METHODS                           //
+	///////////////////////////////////////////////////////////////////////////
 	public static function makeHashFromSpec(key:String, value:String, ?h:Hash<Dynamic>, ?recursion:Int) : Hash<Dynamic>
 	{
 		//trace(here.methodName + " key: "+key + " value: "+value + " recurse: "+recursion);
@@ -264,130 +451,6 @@ class Hive {
 		return rv;
 	}
 
-	///////////////////////////////////////////////////////////////////////////
-	//                  neko.Web COMPAT STATIC METHODS                       //
-	///////////////////////////////////////////////////////////////////////////
-	public static function setReturnCode(r:Int) : Void {
-		Response.setStatus(r);
-	}
-
-	public static function setHeader(h : String, v : String) : Void {
-		if(Response.headers_sent)
-			err("Headers already sent", haxe.Stack.callStack());
-		Response.setHeader(h, v);
-	}
-
-	public static function setCookie(k : String, v : String) : Void {
-		var c = new HttpCookie(k,v);
-		Response.cookies.add(c);
-	}
-
-	public static function redirect(url : String) : Void {
-		setHeader("Location", url);
-		setReturnCode(302);
-	}
-	//public static function parseMultipart(onPart : (String -> String -> Void), onData : (String -> Int -> Int -> Void)) : Void {}
-	public static function isModNeko() : Bool { return false; }
-	public static function getURI(Void) : String { return Request.url; }
-	public static function getPostData(Void) : String { return Request.post_vars; }
-	//TODO
-	public static function getParamsString(Void) : String { return ""; }
-	//TODO
-	public static function getParams(Void) : Hash<String> { return new Hash<String>(); }
-	//TODO
-	public static function getParamValues(param : String) : Array<String> {
-		return new Array<String>();
-	}
-	//TODO
-	public static function getMultipart(maxSize : Int) : Hash<String> {
-		return new Hash<String>();
-	}
-	public static function getHostName() : String {
-		return Std.string(Request.host);
-	}
-	public static function getCwd(Void) : String {
-		var p : String = Request.path_translated;
-		if(Request.path.charAt(0) != "/")
-			p = p + "/";
-		p = p + Request.path;
-		p = p.substr(0,p.lastIndexOf("/"));
-		return p;
-	}
-	public static function getCookies() : Hash<String> {
-		var rv = new Hash<String>();
-		var cv : Array<HttpCookie> = Request.getCookies();
-		for(i in cv)
-			rv.set(i.getName(), i.getValue());
-		return rv;
-	}
-	public static function getClientIP() : String {
-		return Request.client.remote_host.toString();
-	}
-	public static function getClientHeaders() : List<{ value : String, header : String }> {
-		var rv = new List<{ value : String, header : String }>();
-		var h : List<{key: String,value: String}> = Request.headers_in;
-		for(i in h) {
-			rv.add({value:i.value,header:i.key});
-		}
-		return rv;
-	}
-	public static function getClientHeader(k : String) : String {
-		return Request.getHeaderIn(k);
-	}
-	public static function getAuthorization() : { user : String, pass : String } {
-		var t = { user:"Me",pass:"me"};
-		return t;
-	}
-	public static function flush() : Void {
-		//trace("THREAD ID:" + Reflect.field(thread,"id"));
-		send_message(HiveThreadMessage.FLUSH);
-	}
-	public static function cacheModule(f : (Void -> Void)) : Void {}
-
-
-	///////////////////////////////////////////////////////////////////////////
-	//                  FORM HANDLING STATIC METHODS                         //
-	///////////////////////////////////////////////////////////////////////////
-
-	/**
-		Check if an html checkbox is set
-		Either specify the source (_POST or _GET vars), or the
-		default merged environment GP will be used.
-	*/
-	public static function formIsChecked(name:String, ?source:Hash<Dynamic>) : Bool {
-		if(source == null)
-			source = _GETPOST;
-		return if(source.get(name) == "on") true; else false;
-	}
-
-	/**
-		Return text from form field. If field does not exist,
-		returns empty string. If field is a hash, it will be
-		converted to a string.
-	*/
-	public static function formField(name:String, ?source:Hash<Dynamic>) :String {
-		if(source == null)
-			source = _GETPOST;
-		if(!source.exists(name))
-			return "";
-		if(Type.getClassName(Type.getClass(source.get(name))) == "Hash")
-			return(source.get(name).toString());
-		return source.get(name);
-	}
-
-	/**
-		Return a form Hash. If field does not exist, or is not a
-		hash, will return null.
-	*/
-	public static function formHash(name:String, ?source:Hash<Dynamic>) : Hash<Dynamic> {
-		if(source == null)
-			source = _GETPOST;
-		if(!source.exists(name))
-			return null;
-		if(Type.getClassName(Type.getClass(source.get(name))) != "Hash")
-			return null;
-		return source.get(name);
-	}
 
 	static var send_message = neko.Lib.load("hive","send_message",1);
 }

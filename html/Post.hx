@@ -9,13 +9,16 @@ class Post extends Hive {
 
 
 	public function cookieTest() {
-		Hive.Response.setCookie(new HttpCookie("blah","testing"));
-		setCookie(new HttpCookie("blah21","testing21"));
-		Hive.Response.setCookie(new HttpCookie("blah2","testing2"));
+		Hive.setCookie(new HttpCookie("foo","bar"));
+		var c = new HttpCookie("fooexpire","expiredval");
+		c.setExpires(Date.fromTime(Date.now().getTime()-3600));
+		Hive.setCookie(c);
+		Hive.setCookie(new HttpCookie("space embedded","Testing url encoding"));
 	}
 
-	public function handleRequest(req:Dynamic, resp:Dynamic) {
-		super.handleRequest(req, resp);
+	//public function handleRequest(req:Dynamic, resp:Dynamic) {
+	public function entryPoint() : Void {
+		//super.handleRequest(req, resp);
 		//cookieTest();
 		if(Hive.formIsChecked("redirect")) {
 			Hive.redirect("/index.html");
@@ -38,8 +41,14 @@ class Post extends Hive {
 
 		Hive.print("<h2>Flush test</h2>\n");
 		Hive.flush();
-		neko.Sys.sleep(5);
+		neko.Sys.sleep(3);
 		Hive.print("Done sleeping");
+
+		Hive.print("<h2>Cookies</h2>");
+		for(i in Hive._COOKIE.keys()) {
+			Hive.printbr("Client cookie name: " + Hive.urlEncodedToHtml(i) + " value: " + Hive.urlEncodedToHtml(Hive._COOKIE.get(i)));
+		}
+		Hive.printbr("The cookie named fooexpire should not appear in the list above");
 	}
 
 	public static function main() {
