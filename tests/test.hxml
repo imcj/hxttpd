@@ -1,14 +1,26 @@
--main Test.hx
--neko Test.n
+#-main TmpFileTest.hx
+#-x TmpFileTest
+#-cp ../src
 
---next
-
--main TestGmtDate.hx
--x TestGmtDate
+-main CookieTest.hx
+-x CookieTest
 -cp ../src
 
---next
+#--next
 
--main LoaderTest.hx
--x LoaderTest
--cp ../src
+#-main Test.hx
+#-neko Test.n
+
+#--next
+
+#-main TestGmtDate.hx
+#-x TestGmtDate
+#-cp ../src
+
+#--next
+
+#-main LoaderTest.hx
+#-x LoaderTest
+#-cp ../src
+
+
