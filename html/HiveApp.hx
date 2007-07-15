@@ -9,15 +9,15 @@ class HiveApp extends Hive
 		neko.Web.setCookie("cook2","val2");
 
 
-		println("WebApp Entry Point");
-		//var hi : List<{ value : String, header : String}>  = neko.Web.getClientHeaders(); 
+		Hive.println("WebApp Entry Point");
+		//var hi : List<{ value : String, header : String}>  = neko.Web.getClientHeaders();
 		/*
 		for(i in hi) {
 			print(i.value + " " + i.header+"<br>\n");
 		}
 		*/
 
-		print("<hr><h1>Cookies</h1></ br>\n");
+		Hive.print("<hr><h1>Cookies</h1></ br>\n");
 		//var c = neko.Web.getCookies();
 		/*
 		for(i in c.keys()) {
