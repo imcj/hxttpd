@@ -23,60 +23,62 @@ enum HttpMethod {
 	METHOD_HEAD;
 }
 
-enum ResponseType {
-	TYPE_UNKNOWN;
-	TYPE_FILE;
-	TYPE_CGI;
+// application/x-www-form-urlencoded (FORM)
+//
+enum PostType {
+	POST_NONE;
+	POST_FORM;
+	POST_MULTIPART;
+}
+
+typedef VarList = {
+	key: String,
+	value: String
 }
 
 class HttpdRequest {
-	public var requestline				: String;
-        public var method 				: HttpMethod;
-        public var url 					: String;
-	public var args					: String;
-        public var version 				: String;
-        public var version_major			: Int;
-        public var version_minor			: Int;
-	public var agent 				: String;
-	public var referer 				: String;
-	public var host 				: String;
-	public var port 				: Int;
-	public var path 				: String;
-	public var path_translated			: String;
-	public var path_info				: String;
-        public var headers_in 				: List<{ value : String, header : String}>;
-	public var post_data 				: String;
-	public var in_content_type			: String;
-	public var in_content_length			: Int;
-	public var in_transfer_encoding			: String;
-	public var in_content_boundary			: String;
-	public var in_ranges				: Array<HttpdRange>;
-	public var username				: String;
-	public var cpassword				: String;
-	public var if_unmodified_since			: GmtDate;
-	public var if_modified_since			: GmtDate;
+	public var requestline			: String;
+        public var method 			: HttpMethod;
+        public var url 				: String;
+	public var uriparts			: Array<String>;
+	public var args				: String;
+        public var version 			: String;
+        public var version_major		: Int;
+        public var version_minor		: Int;
+	public var agent 			: String;
+	public var referer 			: String;
+	public var host 			: String;
+	public var port 			: Int;
+	public var path 			: String;
+	public var path_translated		: String;
+	public var path_info			: String;
+	public var headers_in			: List<VarList>;
+	public var post_data 			: String;
+	public var post_type			: PostType;
+	public var in_content_type		: String;
+	public var in_content_length		: Int;
+	public var in_transfer_encoding		: String;
+	public var in_content_boundary		: String;
+	public var in_ranges			: Array<HttpdRange>;
+	public var username			: String;
+	public var cpassword			: String;
+	public var if_unmodified_since		: GmtDate;
+	public var if_modified_since		: GmtDate;
 
-	// response to request
-	public var return_code                		: Int;
-	public var headers_out 	        		: List<String>;
-	public var type					: ResponseType;
-	public var message				: String;
-	public var file					: FileInput;
-	public var bytes_left				: Int;
-	public var content_count			: Int;
-	public var content_type			 	: String;
-	public var content_length 			: Int;
-	public var content_boundary(default,null)	: String;
-	public var last_modified			: GmtDate;
-	public var location				: String;
-	public var ranges				: Array<HttpdRange>;
-	public var multipart				: Bool;
-	public var keepalive				: Bool;
 
-	var client					: HttpdClientData;
+	public var cookies(getCookies,null)	: Array<HttpCookie>;
+	public var get_vars			: Array<VarList>;
+	public var post_vars			: Array<VarList>;
+	public var file_vars			: Array<HttpdRequestResource>;
 
-	public function new(client:HttpdClientData) {
+
+	public var client(default,null)			: HttpdClientData;
+	public var serial_number			: Int;
+	private var tmpfile				: neko.io.TmpFile;
+
+	public function new(client:HttpdClientData, serial:Int) {
 		this.client = client;
+		this.serial_number = serial;
 		init();
 	}
 
@@ -84,6 +86,7 @@ class HttpdRequest {
 		requestline = null;
 		method = METHOD_UNKNOWN;
 		url = null;
+		uriparts = new Array();
 		args = null;
 		version = null;
 		agent = null;
@@ -94,7 +97,8 @@ class HttpdRequest {
 		path_translated = null;
 		path_info = null;
 		headers_in = new List();
-		post_data = null;
+		post_data = "";
+		post_type = POST_NONE;
 		in_content_type = null;
 		in_content_length = 0;
 		in_transfer_encoding = null;
@@ -105,86 +109,34 @@ class HttpdRequest {
 		if_unmodified_since = null;
 		if_modified_since = null;
 
-		return_code = 0;
-		headers_out = new List();
-		type = TYPE_UNKNOWN;
-		message = null;
-		file = null;
-		bytes_left = null;
-		//mime_type = null;
-		content_count = 0;
-		content_type = null;
-		content_length = 0;
-		content_boundary = generateContentBoundary();
-		last_modified = null;
-		location = null;
-		ranges = null;
-		multipart = false;
-		keepalive = true;	// HTTP/1.1 Default
+		cookies = new Array<HttpCookie>();
+		get_vars = new Array<VarList>();
+		post_vars = new Array<VarList>();
+		file_vars = new Array<HttpdRequestResource>();
+	}
+
+	public function getMainModuleRequest() {
+		return this;
 	}
 
 	public function getHeaderIn(key:String) : String {
 		var klc = key.toLowerCase();
 		for(i in headers_in) {
-			if(i.header.toLowerCase() == klc)
+			if(i.key.toLowerCase() == klc)
 				return i.value;
 		}
 		return null;
 	}
 
-	public function getCookies() : Hash<String> {
-		var ch = new Hash<String>();
-		var p = new Array<String>();
-		for(i in headers_in) {
-			if(i.header.toLowerCase() != "cookie")
-				continue;
-			var pp = i.value.split("; ");
-			p = p.concat(pp);
-		}
-		for(i in p) {
-			var pp = i.split("=");
-			ch.set(pp[0],pp[1]);
-		}
-		return ch;
-	}
-
-	/**
-		Create a response content boundary string.
-		TODO: This should notbe called on initialization
-			of the request
-	**/
-	public static function generateContentBoundary() : String {
-		var s : String = "------------";
-		for(x in 0...55) {
-			var r = Std.random(62);
-			if(r < 10) { // 0-9
-				s += Std.chr(48 + r);
-			}
-			else if(r < 36) { // A-Z
-				s += Std.chr(55 + r);
-			}
-			else { // a-z
-				s += Std.chr(61 + r);
-			}
-		}
-		return s;
-	}
-
-	public static function parseArgs(s_args:String) : Dynamic {
-		var args = s_args.substr(1).split("&");
-		var r = Reflect.empty();
-		for (a in args) {
-			var v = a.split("=");
-			Reflect.setField(r,StringTools.trim(v[0]),StringTools.trim(v[1]));
-		}
-		return r;
+	public function getCookies() : Array<HttpCookie> {
+		return cookies;
 	}
 
 	public function setRequestHeader(key : String, val : String) : Bool {
 		// request headers are case insensitive
 		if(key == null || val == null)
 			return true;
-		headers_in.push({value:val, header:key});
+		headers_in.push({key:key, value:val});
 
 		key = key.toLowerCase();
 		if(key == "host") {
@@ -197,15 +149,15 @@ class HttpdRequest {
 		}
 		if(key == "connection") {
 			if(val.toLowerCase() == "keep-alive")
-				keepalive = true;
+				client.response.keepalive = true;
 			else
-				keepalive = false;
+				client.response.keepalive = false;
 			return true;
 		}
 		if(key == "keep-alive") {
 			//Keep-Alive: 300
 			//Connection: keep-alive
-			keepalive = true;
+			client.response.keepalive = true;
 			return true;
 		}
 		if(key == "content-type") {
@@ -215,7 +167,7 @@ class HttpdRequest {
 			var p = val.indexOf(";");
 			if( p == 1 || p >= val.length - 1 ) {
 				trace("Request: invalid content-type " + val);
-				return_code = 400;
+				client.response.setStatus(400);
 				return false;
 			}
 			if(p > 0) {
@@ -228,6 +180,10 @@ class HttpdRequest {
 			else {
 				in_content_type = val;
 			}
+			if(in_content_type.toLowerCase() == "application/x-www-form-urlencoded")
+				post_type = POST_FORM;
+			else
+				post_type = POST_MULTIPART;
 			return true;
 		}
 		if(key == "content-length") {
@@ -280,30 +236,25 @@ class HttpdRequest {
 			*/
 			return true;
 		}
+		if(key == "cookie") {
+			try {
+				var cArray = HttpCookie.fromString(val);
+				cookies = cookies.concat(cArray);
+			} catch(e:Dynamic) {
+				//client.server.log_error("Invalid cookie header "+val);
+			}
+			return true;
+		}
 		if(key == "if-range") {
 		}
 		if(key == "expect") {
 			// expect 100-continue
-			return_code = 417;
+			client.response.setStatus(417);
 			return false;
 		}
 		if(key == "authorization") {
 		}
 		return true;
-	}
-
-	public function addResponseHeader(key : String, value : String) : Void
-	{
-		headers_out.add(key + ": " + value);
-	}
-
-	public function setMessage(value : String) : Void
-	{
-		content_type = "text/html";
-		content_length = value.length;
-		content_count = 1;
-		last_modified = null;
-		message = value;
 	}
 
 	public function setHost(value : String) : Bool
@@ -321,60 +272,48 @@ class HttpdRequest {
 		return true;
 	}
 
-	public function processRequest(line : String) : Bool {
+	public function processRequest(line : String) : Int {
 		line = StringTools.trim(line);
 		requestline = line; // for logging
 
-		if(line.length == 0) {
-			return_code = 400;
-			return false;
-		}
+		if(line.length == 0)
+			return 400;
 
 		var r : EReg = ~/HTTP\/([0-9.]+)$/g;
-		if(! r.match(line)) {
-			return_code = 505;
-			return false;
-		}
+		if(! r.match(line))
+			return 505;
+
 		version = r.matched(1);
-		if(version == "1.0") {
-			keepalive = false;
-		} else if(version != "1.1") {
-			return_code = 505;
-			return false;
-		}
+		if(version == "1.0")
+			client.response.keepalive = false;
+		else if(version != "1.1")
+			return 505;
+
 		// wipe out HTTP and trim input
 		line = StringTools.trim(r.replace(line, ""));
 
+		// parse method
 		var data = line.split(" ");
-		if(data.length == 0) {
-			return_code = 400;
-			return false;
-		}
-		if(data[0] == "GET") {
+		if(data.length == 0)
+			return 400;
+		if(data[0] == "GET")
 			method = METHOD_GET;
-		}
-		else if(data[0] == "HEAD") {
+		else if(data[0] == "HEAD")
 			method = METHOD_HEAD;
-		}
-		else if(data[0] == "POST") {
+		else if(data[0] == "POST")
 			method = METHOD_POST;
-		}
-		if(method == METHOD_UNKNOWN) {
-			return_code = 501;
-			return false;
-		}
+		if(method == METHOD_UNKNOWN)
+			return 501;
 
-		if(data.length != 2) {
-			return_code = 404;
-			return false;
-		}
+		// no url
+		if(data.length != 2)
+			return 404;
+
 		url = data[1];
 		// Request-URI Too Long
-		if(url.length > 1024) {
-			return_code = 414;
-			return false;
-		}
-		return true;
+		if(url.length > 1024)
+			return 414;
+		return 200;
 	}
 
 	public function processHeaders(lines : Array<String>) : Bool {
@@ -389,8 +328,8 @@ class HttpdRequest {
 					value = value + " " + StringTools.trim(i);
 					if(!setRequestHeader(lastkey, value)) {
 						trace("Request: invalid header "+i);
-						if(return_code == 0)
-							return_code = 400;
+						if(client.response.getStatus() == 0)
+							client.response.setStatus(400);
 						return false;
 					}
 					continue;
@@ -403,7 +342,7 @@ class HttpdRequest {
 				var p = i.indexOf(":");
 				if( p < 2 || p >= i.length - 1 ) {
 					trace("Request: invalid short header "+i);
-					return_code = 400;
+					client.response.setStatus(400);
 					return false;
 				}
 				key = StringTools.trim(i.substr(0, p));
@@ -411,15 +350,15 @@ class HttpdRequest {
 			}
 			if(!setRequestHeader(key, value)) {
 				trace("Request: invalid header "+i);
-				if(return_code == 0)
-					return_code = 400;
+				if(client.response.getStatus() == 0)
+					client.response.setStatus(400);
 				return false;
 			}
 			lastkey = key;
 		}
 		// HTTP/1.1 with no host specified
 		if(version_minor > 0 && host == null) {
-			return_code = 400;
+			client.response.setStatus(400);
 			return false;
 		}
 		return true;
@@ -430,9 +369,21 @@ class HttpdRequest {
 		does not do translation to filesystem
 	**/
 	public function processUrl() : Bool {
+		// strip off args
+		args = null;
+		var i : Int = url.indexOf("?");
+		if(i >= 0) {
+			var urlcpy = url;
+			url = url.substr(0,i);
+			if(i < urlcpy.length - 1)
+				args = urlcpy.substr(i+1);
+			trace(url + " args: " + args);
+			get_vars = parseGetStyleVars(args);
+		}
+
 		url = StringTools.urlDecode(url);
 		if(url == null) {
-			return_code = 400;
+			client.response.setStatus(400);
 			return false;
 		}
 		// full url
@@ -441,7 +392,7 @@ class HttpdRequest {
 			var newUrl : String;
 			if(idx < 0) {
 				HxTTPDTinyServer.log_error(client, "Absolute URL incomplete "+url, 1);
-				return_code = 400;
+				client.response.setStatus(400);
 				return false;
 			}
 			idx += 2;
@@ -455,74 +406,273 @@ class HttpdRequest {
 			}
 			if(! setHost(url.substr(idx, idx2-idx))) {
 				HxTTPDTinyServer.log_error(client, "Absolute URL incomplete "+url, 1);
-				return_code = 400;
+				client.response.setStatus(400);
 				return false;
 			}
 			url = newUrl;
 			trace(here.methodName + " FULL URL host=" + host + ":" + Std.string(port) + " url="+url);
 		}
-		args = null;
-		var i : Int = url.indexOf("?");
-		if(i < 0) {
-			path = url;
-		}
-		else {
-			path = url.substr(0,i);
-			if(i < url.length - 1)
-				args = url.substr(i+1);
-			trace(path + " args: " + args);
-		}
+		path = url;
 		return true;
 	}
 
 
-	public function openFile(d : HttpdClientData, filename : String) : Bool {
-		if( file != null ) {
-			HxTTPDTinyServer.log_error(client, "Request already has an open file");
+
+
+	public function startPost() : Bool {
+		switch(post_type) {
+		case POST_NONE:
 			return false;
+		case POST_FORM:
+		case POST_MULTIPART:
+			HxTTPDTinyServer.logTrace(here.methodName + " POST_MULTIPART");
+			tmpfile = new neko.io.TmpFile();
 		}
-		try {
-			file = File.read(filename, true);
-			trace(here.methodName + file);
-		}
-		catch(e : Dynamic) { file = null; return false; }
-		type = ResponseType.TYPE_FILE;
-		var stat = FileSystem.stat( filename );
-		last_modified = GmtDate.fromLocalDate(stat.mtime);
-		if(last_modified.gt(GmtDate.now())) {
-			HxTTPDTinyServer.log_error(client, "File "+filename+" has a modification date in the future");
-			last_modified = GmtDate.now();
-		}
-		content_length = stat.size;
-		content_count = 1;
-		setMimeType(d, filename);
-		trace(here.methodName + " file: " + filename + " size: " + stat.size);
 		return true;
 	}
-
-	function setMimeType(d : HttpdClientData, filename : String) : Bool {
-		content_type = "unknown/unknown";
-		var r : EReg = ~/\.([0-9A-Za-z]+)$/;
-		r.match(filename);
-		try {
-			//mime_type = Mime.extensionToMime(r.matched(1));
-			content_type = Mime.extensionToMime(r.matched(1));
-		}
-		catch(e :Dynamic) {}
-		trace(here.methodName + " " + content_type);
-		return true;
-	}
-
 
 	/**
 		Add post data to the request
-		Should actually open a temp file for storage
 	*/
 	public function addPostData(buf : String, bufpos : Int, buflen : Int ) : Bool {
-		//trace(here.methodName + " in_content_type "+ in_content_type + "["+in_content_boundary+"]");
-		post_data += buf.substr(bufpos, buflen);
-		//trace(here.methodName + " >> DATA FOLLOWS\n" + data + "\n>> END OF POST DATA");
+		switch(post_type) {
+		case POST_NONE:
+			return false;
+		case POST_FORM:
+			// must consume all of it.
+			post_data += buf.substr(bufpos, buflen);
+			if(post_data.length > (256*1024))
+				throw "Post data overflow";
+			return true;
+		case POST_MULTIPART:
+			HxTTPDTinyServer.logTrace(here.methodName + " POST_MULTIPART "+buflen+" bytes from "+bufpos);
+			try {
+				tmpfile.getOutput().writeBytes(buf, bufpos, buflen);
+				//tmpfile.getOutput().write(buf.substr(bufpos,buflen));
+			} catch(e:Dynamic) {
+				trace(here.methodName + " file write error");
+				return true;
+			}
+			return true;
+		}
+		return false;
+	}
+
+	public function postComplete() : Bool {
+		switch(post_type) {
+		case POST_NONE:
+			return true;
+		case POST_FORM:
+			return post_data.length >= in_content_length;
+		case POST_MULTIPART:
+			return tmpfile.getOutput().tell() >= in_content_length;
+		}
 		return true;
+	}
+
+	public function finalizePost() {
+		//trace(here.methodName);
+		switch(post_type) {
+		case POST_NONE:
+			throw(here.methodName + " post_type in invalid state POST_NONE");
+		case POST_FORM:
+			post_vars = post_vars.concat(parseGetStyleVars(post_data));
+			//HxTTPDTinyServer.logTrace(post_vars.toString(),4);
+		case POST_MULTIPART:
+			HxTTPDTinyServer.logTrace(here.methodName + " POST_MULTIPART");
+			try {
+				var fi = tmpfile.getInput();
+				fi.seek(0, SeekBegin);
+				trace(fi.readAll());
+				//tmpfile.close();
+
+				parseMultipartFile(tmpfile, this);
+			}
+			catch(e:Dynamic) { trace(e); }
+			//trace(post_vars);
+		}
+	}
+
+	public function setClientState(s:Int) {
+		client.setState(s);
+	}
+
+
+	///////////////////////////////////////////////////////////////////////////
+	//                     STATIC METHODS                                    //
+	///////////////////////////////////////////////////////////////////////////
+
+	public static function parseGetStyleVars(s:String) : Array<VarList> {
+		var rv = new Array<VarList>();
+		var args = s.split("&");
+		for(i in args) {
+			var v = i.split("=");
+			rv.push(
+				{ 	key: StringTools.urlDecode(v[0]),
+					value:StringTools.urlDecode(v[1])
+				}
+			);
+		}
+		return rv;
+	}
+
+
+	public static function parseCookies(cookies:Array<HttpCookie>) {
+		var rv = new Hash<String>();
+		for(i in cookies) {
+			// TODO date checking
+			rv.set(i.getName(), i.getValue());
+		}
+		return rv;
+	}
+
+	public static function parseMultipartFile(f:neko.io.TmpFile, r:HttpdRequest) : Void {
+		//HxTTPDTinyServer.logTrace(here.methodName,5);
+		var DEFAULT_BUFSIZE = 16*1024;
+		var fi = f.getInput();
+		//var fo = f.getOutput();
+		//------------oikgW9sSmaGyRqbcpTZLpZSn1VaGBhyxPjcusUMc4cYVR85GbeZRE0C
+		//Content-Disposition: form-data; name="file_two"; filename=""
+
+		var findValue = function(s:String, p:Int) : String {
+			var value : String;
+			if(p < 0)
+				return null;
+			if(s.charAt(p) != '"') {
+				if(s.charAt(p) == "")
+					return null;
+				value = s.substr(p);
+			}
+			else {
+				var e = s.indexOf('"',p+1);
+				value = s.substr(p+1,e-p-1);
+			}
+			return value;
+		}
+
+		var s : String;
+		var headLines = new List<String>();
+		try { fi.seek(0, SeekBegin); } catch(e:Dynamic) { return; }
+
+		var boundary = StringTools.trim("---"+r.in_content_boundary);
+		while(true) {
+			var name : String = null;
+			var mime : String = null;
+			var resource : HttpdRequestResource = null;
+
+			//HxTTPDTinyServer.logTrace(">> readLine()");
+			try { s = fi.readLine(); } catch(e:Dynamic) { return; }
+			//HxTTPDTinyServer.logTrace("   "+s);
+			if(s != boundary) {
+				return;
+			}
+			headLines.clear();
+
+			try {
+				while("" != (s = fi.readLine()) ) {
+					//HxTTPDTinyServer.logTrace("   "+s);
+					if(headLines.length > 20)
+						return;
+					if(s.length > (20 *1024))
+						return;
+					headLines.add(s);
+				}
+			}
+			catch (e : Dynamic) { return; }
+
+			// processHeaders
+			var headers = new Hash<String>();
+			for(i in headLines) {
+				i = StringTools.trim(i);
+				if(i.length == 0)
+					return;
+     				var p = i.indexOf(":");
+				if( p < 2 || p >= i.length - 1 ) {
+					HxTTPDTinyServer.logTrace(here.methodName + ": invalid short header while parsing multipart data "+i,0);
+					return;
+				}
+				headers.set(StringTools.trim(i.substr(0, p)).toLowerCase(), StringTools.trim(i.substr(p+1)));
+			}
+
+			//trace(headers);
+			if(!headers.exists("content-disposition"))
+				return;
+			s = headers.get("content-disposition");
+
+			var p = s.indexOf("name=");
+			if(p < 0)
+				return;
+			p += 5;
+			name = findValue(s, p);
+			if(name.length == 0)
+				return;
+
+			resource = new HttpdRequestResource(name);
+			p = s.indexOf("filename=");
+			if(p >= 0) {
+				p += 9;
+				resource.setFilename(findValue(s, p));
+				if(headers.exists("content-type"))
+					resource.mime_type = StringTools.trim(headers.get("content-type"));
+			}
+
+			while(true) {
+				var buf : String = neko.Lib.makeString(DEFAULT_BUFSIZE);
+				var buflen : Int = 0;
+				var bytesRead : Int = 0;
+				var eof:Bool = false;
+				try{
+					bytesRead = fi.readBytes(buf, 0, DEFAULT_BUFSIZE);
+				}
+				catch(e:neko.io.Eof) {}
+				catch(e:Dynamic) {
+					trace("POST data io error");
+					return;
+				}
+				eof = fi.eof();
+
+				p = buf.indexOf(boundary);
+
+				try {
+					if(p < 0) {
+						// boundary not found, assume may be partly
+						// at end of buffer.
+						buflen = bytesRead - boundary.length - 1;
+						resource.addData(buf, 0, buflen);
+					}
+					else {
+					// boundary found.
+						buflen = p;
+						// do not add the \r\n
+						resource.addData(buf, 0, buflen-2);
+					}
+				}
+				catch(e:Dynamic) {
+					try {fi.seek(0-(bytesRead - buflen), SeekCur);}
+					catch(e:Dynamic) { return; }
+					break;
+				}
+
+				try {
+					// reset for next read
+					fi.seek(0-(bytesRead - buflen), SeekCur);
+				} catch(e:Dynamic) {
+					resource = null;
+					return;
+				}
+				if(p>=0 || eof) break;
+			} // while true read data
+
+			if(resource.isFile) {
+				r.file_vars.push(resource);
+			}
+			else {
+				// add post var
+				// TODO: length checking etc.
+				trace(resource.getValue());
+				r.post_vars.push({key:resource.name, value:resource.getValue()});
+			}
+		} // while true read header
 	}
 }
 

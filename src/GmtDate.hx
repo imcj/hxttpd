@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/** 
+/**
   Representing and translating GMT dates
 */
 class GmtDate {
@@ -19,7 +19,7 @@ class GmtDate {
 	static var l2gmt_add				: Float		= 0;
 	static var gmt2l_add				: Float		= 0;
 
-	var localtime : Date;	
+	var localtime : Date;
 
 	public function new()
 	{
@@ -28,6 +28,10 @@ class GmtDate {
 
 	public function getTime() : Float {
 		return localtime.getTime();
+	}
+
+	public function getLocalDate() : Date {
+		return Date.fromTime(localtime.getTime());
 	}
 
 	public function rfc822timestamp() : String {
@@ -95,13 +99,13 @@ class GmtDate {
 	}
 
 
-	/** 
+	/**
 	  Parses dates in formats that haXe.Date does, as well as asctime, RFC 1036, and RFC 1123 dates,
 	  which are all assumed to be in the GMT/UTC time.
  	  Sunday, 06-Nov-94 08:49:37 GMT ; RFC 850, obsoleted by RFC 1036
 	  Sun Nov  6 08:49:37 1994       ; ANSI C's asctime() format
 	  Sun, 06 Nov 1994 08:49:37 GMT  ; RFC 822, updated by RFC 1123 (preferred http/1.1)
-	  Will throw on invalid date formats 
+	  Will throw on invalid date formats
 	*/
         static public function fromString(s : String) : GmtDate {
 		var d : Date;

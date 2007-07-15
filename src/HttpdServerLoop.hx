@@ -58,7 +58,7 @@ class HttpdServerLoop<ClientData> {
 
 
 	/**
-		Each client has an output buffer, for buffering file output. This is 16K by default.
+		Each client has an output buffer, for buffering file output. This is 4K by default.
 	**/
 	public static var MAX_OUTBUFSIZE = (1 << 12);
 

@@ -16,16 +16,15 @@ import neko.FileSystem;
 import neko.io.File;
 
 import HttpdRequest.HttpMethod;
-import HttpdRequest.ResponseType;
-import HttpdClientData.ConnectionState;
-import HttpdPlugin.Response;
+import HttpdResponse.ResponseType;
+import HttpdPlugin;
 
 class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
-	public static var SERVER_VERSION 	: String	= "0.2";
+	public static var SERVER_VERSION 	: String	= "0.3";
 	public static var default_port 		: Int		= 80;
 	public static var log_format		: String 	= "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\"";
-	public static var debug_level		: Int		= 4;
+	public static var debug_level		: Int		= 0;
 	public var document_root		: String;
 	public var index_names			: Array<String>;
 	public var host				: Host;
@@ -40,17 +39,19 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	var error_loggers			: List<HttpdLogger>;
 
 	var vmPlugin				: neko.vmext.VmLoader;
-	//var plugins				: List<HttpdPlugin>;
-	var plugins				: List<Dynamic>;
+	var plugins				: List<HttpdPlugin>;
+	var pluginpath				: Array<String>;
+	//var plugins				: List<Dynamic>;
+
+	var request_serial			: Int;
 
 	public function new() {
 		super(onConnect);
+		logTrace("\nHxTTPD init...\n",1);
 		// parent
 		this.listenCount = 512;
 
 		this.document_root = neko.Sys.getCwd();
-		var r : EReg = ~/\/$/;
-		this.document_root = r.replace(this.document_root, "");
 		this.index_names = new Array();
 		this.index_names.push("index.html");
 		this.index_names.push("index.htm");
@@ -64,21 +65,47 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		this.error_loggers = new List();
 
 		this.vmPlugin = new neko.vmext.VmLoader();
-		this.vmPlugin.addPath(neko.Sys.getCwd()+"plugins/");
+		//this.vmPlugin.addPath(neko.Sys.getCwd()+"plugins/");
 		neko.Sys.putEnv("NEKOPATH",neko.Sys.getEnv("NEKOPATH")+":"+neko.Sys.getCwd()+"plugins");
+		this.pluginpath = neko.vm.Loader.local().getPath();
 		this.plugins = new List();
 
 		for(i in parseArgs()) {
-			registerPlugin(i);
+			if(!registerPlugin(i))
+				neko.Sys.exit(1);
 		}
+
+		// Automatically load ModNeko if neither it, nor ModHive is
+		// specifically loaded
+		var found = false;
+		for(i in plugins) {
+			if(i.name == "ModNeko" || i.name=="ModHive") {
+				found = true;
+			}
+		}
+		if(!found)
+			if(!registerPlugin("ModNeko"))
+				neko.Sys.exit(1);
+
+		document_root = neko.FileSystem.fullPath(document_root);
+		var r : EReg = ~/\/$/;
+		document_root = r.replace(document_root, "");
 
 		var h = new HttpdLogger("*", "filename", log_format);
 		access_loggers.add(h);
+		request_serial = 0;
 	}
 
 	static function usage() {
-		neko.Lib.print("\n\nHXTTP USAGE:\n");
-		neko.Lib.print("hxttpd --docroot=/path/to/html --pluginpath=/path/to/plugins --port=8080\n\n");
+		neko.Lib.print("\nHxTTPD Server Version " + SERVER_VERSION + " (c) 2007\n");
+		neko.Lib.print("USAGE: hxttpd [options]\n");
+		neko.Lib.print(" Options:\n");
+		neko.Lib.print("  --docroot=/path/to/html\tPath to the server document root.\n");
+		neko.Lib.print("  --pluginpath=/path/to/\tPath to the server plugin directory.\n");
+		neko.Lib.print("  --port=8080\t\t\tThe port to bind to.\n");
+		neko.Lib.print("  --debug=[0-5]\t\t\tLevel of trace messages dumped to console.\n");
+		neko.Lib.print("  --help\t\t\tThis message.");
+		neko.Lib.print("\n");
 		neko.Sys.exit(0);
 	}
 
@@ -95,10 +122,11 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 				this.document_root = parts[1];
 			case "--pluginpath":
 				if(!neko.FileSystem.isDirectory(parts[1])) {
-					neko.Lib.println("Document root "+parts[1]+" does not exist");
+					neko.Lib.println("Plugin path "+parts[1]+" does not exist");
 					usage();
 				}
 				neko.Sys.putEnv("NEKOPATH",neko.Sys.getEnv("NEKOPATH")+":"+parts[1]);
+				pluginpath.push(parts[1]);
 			case "--load":
 				if(parts[1] == null) {
 					neko.Lib.println("No plugin specified for --load");
@@ -111,6 +139,15 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 					neko.Lib.print("Port out of range\n");
 					usage();
 				}
+			case "--debug":
+				var lvl = Std.parseInt(parts[1]);
+				if(lvl>=0 && lvl<=5) {
+					debug_level = lvl;
+				}
+				else {
+					neko.Lib.print("Invalid debug level\n");
+					usage();
+				}
 			default:
 				usage();
 			}
@@ -119,19 +156,49 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	}
 
 	override public function run(host : Host, port : Int ) {
-		neko.Lib.println("HxTTPD Server Version " + SERVER_VERSION + " starting up on " + host.toString() + ":" + Std.string(port)+" "+ GmtDate.timestamp());
+		logTrace("HxTTPD Server Version " + SERVER_VERSION + " starting up on " + host.toString() + ":" + Std.string(port)+" "+ GmtDate.timestamp()+"\n",0);
 		this.host = host;
 		this.port = port;
 		default_port = port;
 		super.run(host, port);
-		trace("HxTTPD Server Version " + SERVER_VERSION + " shutdown");
+		logTrace("HxTTPD Server Version " + SERVER_VERSION + " shutdown",0);
 	}
 
 	function registerPlugin(name:String) : Bool {
-		var vmm = vmPlugin.loadModule(name);
-		var inst = vmm.createInstance(name);
+		logTrace("Initialising module "+name+"...",1);
+
+		for(i in plugins) {
+			if(i.name == name) {
+				logTrace("Warning: plugin "+name+" already loaded.");
+				return true;
+			}
+		}
+		var inst:Dynamic;
+		switch(name) {
+		case "ModHive":
+			inst = new ModHive();
+		case "ModNeko":
+			inst = new ModNeko();
+		default:
+			var m = neko.vm.Loader.local().getCache().get(name);
+			if(m != null) return true;
+			m = neko.vm.Module.readPath(name+".n",pluginpath,neko.vm.Loader.local());
+			m.execute();
+
+			var classes : Dynamic = m.exportsTable().__classes;
+			var c : Class<Dynamic> = Reflect.field(classes,name);
+			inst = Type.createInstance(c,[]);
+		}
+		var func = Reflect.field(inst, "_hConfig");
+		if (Reflect.isFunction(func)) {
+			var rv : Int = Reflect.callMethod(inst,func,[this]);
+			if(rv == HttpdPlugin.ERROR) {
+				logTrace("Error: "+inst.errStr,0);
+				return false;
+			}
+		}
 		plugins.push(inst);
-		neko.Lib.println("Initialized plugin "+name);
+		logTrace("ok",1);
 		return true;
 	}
 
@@ -146,32 +213,31 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	*/
 
 	override public function onInternalError( d : HttpdClientData, e : Dynamic ) {
-		trace(here.methodName);
-		trace(haxe.Stack.toString(haxe.Stack.callStack()));
+		logTrace(here.methodName,3);
 		d.setResponse(500);
-		d.req.setMessage(HttpdResponse.codeToHtml(500));
-		d.req.keepalive = false;
-		prepareResponse(d);
-		sendResponse(d);
+		d.response.setMessage(HttpdResponse.codeToHtml(500));
+		d.response.keepalive = false;
+		d.response.prepare();
+		d.response.send();
 		//STATE_CLOSING:
 		closeConnection(d.sock);
 	}
 
 	override public function onClientWritable(  d : HttpdClientData ) {
 		// TODO: Multipart/ranges
-		if(d.req.bytes_left == null) {
-			d.req.bytes_left = d.req.content_length;
+		if(d.response.bytes_left == null) {
+			d.response.bytes_left = d.response.content_length;
 		}
-		var nbytes = d.req.bytes_left;
+		var nbytes = d.response.bytes_left;
 		if(nbytes > HttpdServerLoop.MAX_OUTBUFSIZE)
 			nbytes = HttpdServerLoop.MAX_OUTBUFSIZE;
 
-		var s = d.req.file.read(nbytes);
+		var s = d.response.file.read(nbytes);
 		clientWrite(d.sock, s, 0, s.length);
-		d.req.bytes_left -= nbytes;
+		d.response.bytes_left -= nbytes;
 
 		// when finished
-		if(d.req.bytes_left <= 0) {
+		if(d.response.bytes_left <= 0) {
 			removeWriteSock(d.sock);
 			d.endRequest();
 			//if(d.state == ConnectionState.STATE_CLOSING) {
@@ -187,28 +253,19 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		var cdata = new HttpdClientData(this, sock);
 		cdata.remote_port = sock.peer().port;
 
-		//var a : { host : Host, port : Int } = sock.peer();
-		//cdata.remote_host = cast(a.host, Host);
-		//var guh : Host = new neko.net.Host(Host.localhost());
-		//guh = a.host;
-		//cdata.remote_host = guh;
-		//if(! Reflect.isObject(cdata.remote_host) )
-		//	trace("a.host is not an object");
-		//trace(Type.getClass(cdata.remote_host));
 
-		// This is a total hack. Seems Socket.peer().host is an Int32
-		// and not a Host object? Any input here would be nice
+		//Std.string(cnx.sock.peer().host.ip);
 		cdata.remote_host = new Host(neko.net.Host.localhost());
 		untyped { cdata.remote_host.ip = sock.peer().host; }
 
-		trace(here.methodName + " New connection from "+ cdata.remote_host.toString() + " port: "+ Std.string(cdata.remote_port), 2);
+		logTrace(here.methodName + " New connection from "+ cdata.remote_host.toString() + " port: "+ Std.string(cdata.remote_port),2);
 		return cdata;
 	}
 
 	override public function onInterval() {
 		var sec = Date.now().getSeconds();
 		for ( i in clients ) {
-			if(i.state != STATE_READY)
+			if(i.state != HttpdClientData.STATE_READY)
 				continue;
 			startResponse(i);
 		}
@@ -222,31 +279,31 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 					Reflect.callMethod(i,func,[this]);
 				}
 			}
-			catch (e:Dynamic) { trace(e); }
+			catch (e:Dynamic) { logTrace(e,0); }
 		}
 		for ( i in clients ) {
 			i.timer++;
 			switch(i.state) {
-			case STATE_WAITING:
+			case HttpdClientData.STATE_WAITING:
 				if(i.timer >= connection_timeout) {
-					trace("Connection timeout");
+					logTrace("Connection timeout",2);
 					closeConnection(i.sock);
 				}
-			case STATE_DATA:
+			case HttpdClientData.STATE_DATA:
 				if(data_timeout > 0 && i.timer >= data_timeout) {
-					trace("Timeout waiting for post data");
+					logTrace("Timeout waiting for post data",3);
 					closeConnection(i.sock);
 				}
-			case STATE_READY:
-			case STATE_PROCESSING:
+			case HttpdClientData.STATE_READY:
+			case HttpdClientData.STATE_PROCESSING:
 				i.timer = 0;
-			case STATE_KEEPALIVE:
+			case HttpdClientData.STATE_KEEPALIVE:
 				//trace(here.methodName + " client keepalive "+ i.timer+"/"+keepalive_timeout);
 				if(i.timer >= keepalive_timeout) {
-					trace("Keepalive timeout");
+					logTrace("Keepalive timeout",3);
 					closeConnection(i.sock);
 				}
-			case STATE_CLOSING:
+			case HttpdClientData.STATE_CLOSING:
 				closeConnection(i.sock);
 			}
 		}
@@ -254,7 +311,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
         override public function onClientData( d : HttpdClientData, buf : String, bufpos : Int, buflen : Int ) : Int {
 		//trace("\n>> "+here.methodName + "\n>> buf: "+buf+"\n>> bufpos: "+bufpos+"\n>> buflen: "+buflen);
-		if( d.state == STATE_WAITING || d.state == STATE_KEEPALIVE) {
+		if( d.state == HttpdClientData.STATE_WAITING || d.state == HttpdClientData.STATE_KEEPALIVE) {
 			var s = buf.substr(bufpos, buflen);
 			var i = s.indexOf("\r\n\r\n");
 			if(i>=0) {
@@ -265,17 +322,31 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 			}
 			return 0;
 		}
-		else if (d.state == STATE_DATA) {
+		else if (d.state == HttpdClientData.STATE_DATA) {
 			//trace(buflen);
 			d.req.addPostData(buf, bufpos, buflen);
-			if(d.req.post_data.length >= d.req.in_content_length) {
+			if(d.req.postComplete()) {
+				logTrace(">> POST DATA");
+				logTrace(d.req.post_data);
+				logTrace(">> END POST DATA");
+				d.req.finalizePost();
 				d.markReady();
 			}
 			return buflen;
 		}
-		trace("Unexpected data "+ buf.substr(bufpos,buflen));
-		trace("Client state is " + Std.string(d.state));
+		logTrace("Unexpected data client state: "+Std.string(d.state),0);
+		if(d.req != null) {
+			logTrace("Request serial number "+d.req.serial_number,0);
+		}
+		else {
+			logTrace("Client has no active request",0);
+		}
                 return 0;
+	}
+
+	public function getRequestSerial() : Int {
+		request_serial++;
+		return request_serial;
 	}
 
 	/**
@@ -286,25 +357,27 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	function beginRequest( d : HttpdClientData, buf : String,  bufpos : Int, buflen : Int ) : Bool {
 		var data : String  = buf.substr(bufpos, buflen);
 
-		trace(here.methodName + " >> INPUT DATA FOLLOWS\n"+StringTools.trim(data)+"\nINPUT DATA END >> bufpos: "+bufpos+" buflen: "+buflen,3);
+		logTrace(here.methodName + " >> INPUT DATA FOLLOWS\n"+StringTools.trim(data)+"\nINPUT DATA END >> bufpos: "+bufpos+" buflen: "+buflen,4);
 
 		d.startNewRequest();
 		data = StringTools.replace(data, "\r\n", "\n");
 		if(data.length == 0) {
-			d.req.return_code = 400;
+			d.response.setStatus(400);
 			closeConnectionError( d );
 			return false;
 		}
 		var lines = data.split("\n");
-		if(! d.req.processRequest(lines[0])) {
-			trace("Invalid request [" + d.req.return_code + "]",1);
+		var rv = d.req.processRequest(lines[0]);
+		if( rv != 200 ) {
+			d.response.setStatus(rv);
+			logTrace("Invalid request [" + d.response.getStatus() + "]",3);
 			closeConnectionError( d );
 			return false;
 		}
 		// shift off the request
 		lines.shift();
 		if(! d.req.processHeaders(lines)) {
-			trace("Headers invalid",1);
+			logTrace("Headers invalid",2);
 			closeConnectionError( d );
 			return false;
 		}
@@ -312,8 +385,12 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		// are we waiting for multipart data?
 		//Content-Type: application/x-www-form-urlencoded
 		//Content-Length: 31
+		// or
+		//Content-Type: multipart/form-data; boundary=----------Jud
+		//Content-Length: 300000
 		if( d.req.in_content_type != null) {
-			d.state = ConnectionState.STATE_DATA;
+			logTrace(here.methodName + " Switching to STATE_DATA for content_length "+d.req.in_content_length);
+			d.awaitPost();
 			return false;
 		}
 		return true;
@@ -325,7 +402,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		// process url -> path + args
 		if(! d.req.processUrl()) {
 			if(d.getResponse() != 304) { // not modified
-				trace("URL invalid");
+				logTrace("URL invalid",4);
 			}
 			closeConnectionError( d );
 			return;
@@ -335,26 +412,35 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 			closeConnectionError( d );
 			return;
 		}
-		if(!translatePath(d)) {
-			if(d.req.return_code < 300)
+
+		switch(translatePath(d)) {
+		case HttpdPlugin.COMPLETE:
+			//return;
+		case HttpdPlugin.SKIP:
+		case HttpdPlugin.ERROR:
+			if(d.response.getStatus() < 300)
 				d.setResponse(404);
 			closeConnectionError( d );
 			return;
+		case HttpdPlugin.PROCESSING:
+			return;
+		default:
+			logTrace(here.methodName + " unhandled response");
 		}
-		prepareResponse(d);
-		sendResponse(d);	// handles connection closing
+		d.response.prepare();
+		d.response.send();	// handles connection closing
 	}
 
 	function closeConnectionError( d : HttpdClientData) : Void {
-		if(d.req.return_code == 500 && d.sock == null)
+		if(d.response.getStatus() == 500 && d.sock == null)
 			return;
-		d.req.keepalive = false;
+		d.response.keepalive = false;
 		var url = d.req.url;
 		if(d.getResponse() == 301)
-			url = d.req.location;
-		d.req.setMessage(HttpdResponse.codeToHtml(d.getResponse(), url));
-		prepareResponse(d);
-		sendResponse(d);
+			url = d.response.location;
+		d.response.setMessage(HttpdResponse.codeToHtml(d.getResponse(), url));
+		d.response.prepare();
+		d.response.send();
 	}
 
 
@@ -397,7 +483,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 			}
 		}
 		else d.req.path = "/";
-		trace(here.methodName + " new path: " + d.req.path);
+		//trace(here.methodName + " new path: " + d.req.path);
 		return true;
 	}
 
@@ -407,95 +493,98 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		pipe or other special files, or any file that can
 		not be opened.
 	**/
-	function translatePath(d : HttpdClientData) : Bool {
+	function translatePath(d : HttpdClientData) : Int {
 		d.req.path_translated = document_root;
+		d.req.uriparts = d.req.path.split("/");
+		d.req.uriparts.shift();
+
 		// hook _hTranslate
 		for ( i in plugins ) {
 			try {
 				var func = Reflect.field(i, "_hTranslate");
 				if (Reflect.isFunction(func)) {
-					var rv : Response = Reflect.callMethod(i,func,[this,d.req]);
-					//trace("Plugin returned "+rv+ " "+Type.typeof(rv));
-					//trace(Type.getEnum(rv));
-					switch(Std.string(rv)) {
-					case "COMPLETE":
-						trace("RETURNING");
-						if(d.req.return_code < 100) {
+					var rv : Int = Reflect.callMethod(i,func,[this,d.req,d.response]);
+					switch(rv) {
+					case HttpdPlugin.COMPLETE:
+						if(d.response.getStatus() < 100) {
 							log_error(d,"Module "+i.name+" did not set response code");
-							d.req.return_code = 200;
+							d.response.setStatus(200);
 						}
-						return true;
-					case "ERROR":
+						return rv;
+					case HttpdPlugin.ERROR:
 						onInternalError(d, null);
-						return false;
-					case "SKIP":
+						return rv;
+					case HttpdPlugin.PROCESSING:
+						return rv;
+					case HttpdPlugin.SKIP:
 					}
 				}
 			}
 			catch (e:Dynamic) {
-				trace(e);
+				logTrace(e,0);
 				onInternalError(d, e);
+				return HttpdPlugin.ERROR;
 			}
 		}
 
-		if(d.req.return_code == 500)
-			return false;
+		if(d.response.getStatus() == 500) {
+			onInternalError(d, null);
+			return HttpdPlugin.ERROR;
+		}
 
 		var p = d.req.path;
 		d.req.path_translated += p;
-		trace(here.methodName + " final: " + d.req.path_translated);
+		logTrace(here.methodName + " final: " + d.req.path_translated,2);
 
 		try {
 			switch(FileSystem.kind(d.req.path_translated)) {
 			case kdir:
 				if(!checkDirIndex( d )) {
 					d.setResponse(404);
-					return false;
+					return HttpdPlugin.ERROR;
 				}
 			case kother(k):
 				if(k != "symlink") {
 					d.setResponse(404);
-					return false;
+					return HttpdPlugin.ERROR;
 				}
 				if(!checkDirIndex( d )) {
 					d.setResponse(404);
-					return false;
+					return HttpdPlugin.ERROR;
 				}
 			case kfile:
-				if(!d.req.openFile(d, d.req.path_translated)) {
+				if(!d.response.openFile(d, d.req.path_translated)) {
 					d.setResponse(404);
+					return HttpdPlugin.ERROR;
 				}
 			}
 		}
 		catch(e : Dynamic) { // file not found
 			d.setResponse(404);
-			return false;
+			return HttpdPlugin.ERROR;
 		}
 
 		if(!processFile(d)) {
 			if(d.getResponse() < 300)
 				d.setResponse(404);
-			return false;
+			return HttpdPlugin.ERROR;
 		}
-		return true;
+		return HttpdPlugin.SKIP;
 	}
 
 
 	function checkDirIndex(d : HttpdClientData) : Bool {
-		trace(here.methodName);
+		//trace(here.methodName);
 		if(d.req.path_translated.charAt(d.req.path_translated.length-1) != "/") {
 			d.setResponse(301);
-			d.req.location = "http://" + d.req.host;
-			if(d.req.port != 0) d.req.location += ":" + Std.string(d.req.port);
-			d.req.location += d.req.path+"/";
+			d.response.location = "http://" + d.req.host;
+			if(d.req.port != 0) d.response.location += ":" + Std.string(d.req.port);
+			d.response.location += d.req.path+"/";
 			return false;
 		}
 		var found = false;
-		trace(index_names);
 		for(i in index_names) {
-			//trace("Trying " + d.req.path_translated + i);
-			if(d.req.openFile(d, d.req.path_translated + i)) {
-				//trace("found");
+			if(d.response.openFile(d, d.req.path_translated + i)) {
 				found = true;
 				break;
 			}
@@ -513,17 +602,9 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		Called from translatePath()
 	**/
 	function processFile(d : HttpdClientData) : Bool {
-		/*
-		if(d.req.method == HttpMethod.METHOD_POST) {
-			trace("POST Method currently unimplemented.");
-			d.closeFile();
-			d.setResponse(501);
-			return false;
-		}
-		*/
 		if(d.req.if_modified_since != null) {
 			//trace("HAS MODIFIED DATE file: " + d.req.last_modified.rfc822timestamp() + " browser: "+ d.req.if_modified_since.rfc822timestamp());
-			if(d.req.last_modified.lt(d.req.if_modified_since) || d.req.last_modified.eq(d.req.if_modified_since)) {
+			if(d.response.last_modified.lt(d.req.if_modified_since) || d.response.last_modified.eq(d.req.if_modified_since)) {
 				//trace("File not modified");
 				d.setResponse(304);
 				d.closeFile();
@@ -534,109 +615,24 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		// if_unmodified_since
 		// if-range
 		// check ranges validity
-		if(d.req.ranges != null) {
-			HttpdRange.satisfyAll(d.req.ranges, d.req.content_length);
+		// copy ranges to response
+		if(d.req.in_ranges != null) {
+			HttpdRange.satisfyAll(d.req.in_ranges, d.response.content_length);
 		}
 		//
 		d.setResponse(200);
 		return true;
 	}
 
-	function prepareResponse(d : HttpdClientData) {
 
-		if(d.req.content_count > 0 && d.getResponse() != 206) {
-			d.req.addResponseHeader("Content-Type", d.req.content_type);
-			if(d.req.last_modified != null)
-				d.req.addResponseHeader("Last-Modified", d.req.last_modified.rfc822timestamp());
-			if(d.req.message != null)
-				d.req.addResponseHeader("Content-Length", Std.string(d.req.message.length));
-			else
-				d.req.addResponseHeader("Content-Length", Std.string(d.req.content_length));
-		}
 
-		switch(d.getResponse()) {
-		case 206: // partial content
-			if(! d.req.multipart) {
-				d.req.addResponseHeader("Content-Type", d.req.content_type);
-				d.req.addResponseHeader("Content-Range", "bytes " + d.req.ranges[0].off_start + "-" + d.req.ranges[0].off_end + "/" + d.req.content_length);
-			}
-			else {
-				d.req.addResponseHeader("Content-type", "multipart/byteranges; boundary="+d.req.content_boundary);
-			}
-			// in the case of multipart, the content-type for the file is sent in the
-			// multipart sections
-		case 301:
-			if(d.req.location != null)
-				d.req.addResponseHeader("Location", d.req.location);
-		case 302:
-			if(d.req.location != null)
-				d.req.addResponseHeader("Location", d.req.location);
-		case 401:
-			d.req.addResponseHeader("WWW-Authenticate", "Basic realm=myrealmchangeme");
-		case 405:
-			d.req.addResponseHeader("Allow","GET, POST, HEAD");
-		case 416:
-			// A server SHOULD return a response with this status code if a request
-			// included a Range request-header field (section 14.35), and none of
-			// the range-specifier values in this field overlap the current extent
-			// of the selected resource, and the request did not include an If-Range
-			// request-header field. (For byte-ranges, this means that the first-
-			// byte-pos of all of the byte-range-spec values were greater than the
-			// current length of the selected resource.)
-			// When this status code is returned for a byte-range request, the
-			// response SHOULD include a Content-Range entity-header field
-			// specifying the current length of the selected resource (see section
-			// 14.16). This response MUST NOT use the multipart/byteranges content-
-			// type.
-
-			d.req.addResponseHeader("Content-Range", "bytes */"+d.req.content_length);
-
-			// which means... what, return only satisfiable ranges, and silently
-			// ignore the rest??
-		}
-
-		if (d.req.in_content_length > 0 || d.req.in_transfer_encoding != null) {
-			d.req.keepalive = false;
-		}
-
-		// 300s are redirects, not modified
-		if(d.req.return_code < 300 || d.req.return_code == 301 || d.req.return_code == 302) {
-			if(d.req.keepalive == true && d.req.version_minor == 0) {
-				d.req.addResponseHeader("Connection", "keep-alive");
-			}
-			else if(d.req.version_minor > 0) {
-				d.req.addResponseHeader("Connection", "close");
-			}
-		}
-		else {
-			d.req.addResponseHeader("Connection", "close");
+	public static function logTrace(s:String, ?level:Int) {
+		if(level==null) level = 5;
+		if(level <= debug_level) {
+			neko.io.File.stdout().write(s+"\n");
+			neko.io.File.stdout().flush();
 		}
 	}
-
-	function sendResponse(d : HttpdClientData) {
-		var head : String = "";
-		head += "HTTP/1.1 "+HttpdResponse.codeToText(d.req.return_code)+"\r\n";
-		head += "Date: "+GmtDate.timestamp()+"\r\n";
-		head += "Server: HxTTPD\r\n";
-		for(i in d.req.headers_out) {
-			head += i + "\r\n";
-		}
-		head += "\r\n";
-		clientWrite(d.sock, head, 0, head.length);
-
-		if(d.req.message != null) {
-			clientWrite(d.sock, d.req.message, 0, d.req.message.length);
-			//closeConnection(d.sock);
-			d.state = STATE_CLOSING;
-		}
-		else {
-			// add them as a writesocket as there
-			// is file data to send to client
-			addWriteSock(d.sock);
-		}
-		log_request(d);
-	}
-
 
 	public static function log_error(d : HttpdClientData, msg : String, ?level : Int)
 	{
@@ -654,6 +650,14 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		for(i in access_loggers) {
 			i.log(d);
 		}
+	}
+
+	public function isPluginRegistered(n:String) : Bool {
+		for(i in plugins) {
+			if(i.name == n)
+				return true;
+		}
+		return false;
 	}
 
 }

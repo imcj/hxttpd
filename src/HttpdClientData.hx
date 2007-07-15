@@ -16,35 +16,30 @@ import neko.net.Host;
 
 import HttpdRequest.HttpMethod;
 
-enum ConnectionState {
-	/** during connection before the server has received a complete header */
-        STATE_WAITING;
-
-	/** While waiting for complete application/x-www-form-urlencoded content */
-	STATE_DATA;
-
-	/** Input data complete. Process on next interval */
-	STATE_READY;
-
-	/** during response */
-        STATE_PROCESSING;
-
-	/** After initial response completed */
-        STATE_KEEPALIVE;
-
-	/** No keepalive, we're closing */
-	STATE_CLOSING;
-}
-
 
 class HttpdClientData {
+	/** during connection before the server has received a complete header */
+	public static var STATE_WAITING 	: Int = 0;
+	/** While waiting for complete application/x-www-form-urlencoded content */
+	public static var STATE_DATA		: Int = 1;
+	/** Input data complete. Process on next interval */
+	public static var STATE_READY		: Int = 2;
+	/** during response */
+	public static var STATE_PROCESSING 	: Int = 3;
+	/** After initial response completed */
+	public static var STATE_KEEPALIVE 	: Int = 4;
+	/** No keepalive, we're closing */
+	public static var STATE_CLOSING		: Int = 5;
+	public static var STATE_MAX		: Int = 5;
+
 	//public var server		: ThreadServer<Connection,String>;
 	public var server(default,null) : HxTTPDTinyServer;
 	public var sock			: Socket;
 	public var remote_host		: Host;
 	public var remote_port		: Int;
-	public var state 		: ConnectionState;
+	public var state 		: Int;
 	public var req 			: HttpdRequest;
+	public var response		: HttpdResponse;
 	private var num_requests	: Int;
 	public var timer		: Int;
 
@@ -53,6 +48,7 @@ class HttpdClientData {
 		sock = s;
 		state = STATE_WAITING;
 		req = null;
+		response = null;
 		num_requests = 0;
 		timer = 0;
 	}
@@ -60,9 +56,19 @@ class HttpdClientData {
 
 	public function startNewRequest() : Void {
 		closeFile(); // close last req file, in case.
-		req = new HttpdRequest(this);
+		req = new HttpdRequest(this,server.getRequestSerial());
+		response = new HttpdResponse(this);
 		num_requests ++;
 		timer = 0;
+	}
+
+	public function awaitPost() : Bool {
+		// TODO: Check states, and make .state(get,null)
+		state = STATE_DATA;
+		if(!req.startPost()) {
+			return false;
+		}
+		return true;
 	}
 
 	public function markReady() : Void {
@@ -76,20 +82,27 @@ class HttpdClientData {
 
 	public function endRequest() : Void {
 		closeFile();
-		if(req.keepalive) {
+		if(response.keepalive) {
 			state = STATE_KEEPALIVE;
 		}
 		else {
 			state = STATE_CLOSING;
 		}
 		req = null;
+		response = null;
 		timer = 0;
+	}
+
+	public function setState(s:Int) : Void {
+		if(s < 0 || s > STATE_MAX)
+			throw("Invalid state set for client");
+		state = s;
 	}
 
 	/** Set response code for current request */
 	public function setResponse(val : Int) : Void {
-		if(req != null) {
-			req.return_code = val;
+		if(req != null && response != null) {
+			response.setStatus(val);
 		}
 		else {
 			throw( new String("req not initialized"));
@@ -101,13 +114,14 @@ class HttpdClientData {
 		if(req == null) {
 			throw( new String("req not initialized"));
 		}
-		return req.return_code;
+		return response.getStatus();
+		//return response.status;
 	}
 
 	/** Close current file associated with request */
 	public function closeFile() : Void {
-		if(req != null && req.file != null) {
-			req.file.close();
+		if(response != null && response.file != null) {
+			response.file.close();
 		}
 	}
 }

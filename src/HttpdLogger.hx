@@ -68,8 +68,8 @@ class HttpdLogger {
                 msg = StringTools.replace(msg, "%u", { if(d.req.username==null) "-"; else d.req.username; });
                 msg = StringTools.replace(msg, "%t", GmtDate.timestamp());
                 msg = StringTools.replace(msg, "%r", d.req.requestline);
-                msg = StringTools.replace(msg, "%>s", Std.string(d.req.return_code));
-                msg = StringTools.replace(msg, "%b", { if(d.req.content_length > 0) Std.string(d.req.content_length); else "-";});
+                msg = StringTools.replace(msg, "%>s", Std.string(d.response.status));
+                msg = StringTools.replace(msg, "%b", { if(d.response.content_length > 0) Std.string(d.response.content_length); else "-";});
                 //msg = StringTools.replace(msg, "%
                 //msg = StringTools.replace(msg, "%
 
