@@ -1,5 +1,5 @@
 CC=gcc
-NDLLS=threadextra.ndll tmpfile.ndll
+NDLLS=threadextra.ndll tmpfile.ndll hive.ndll
 LIBPATH=
 INCPATH=-I ./ -I /usr/include/neko
 LIBS=-lneko
