@@ -480,6 +480,7 @@ trace(2);
 		var uriparts = ti.request.uriparts;
 		// remove moduleName
 		uriparts.shift();
+		/*
 		var method = "handleRequest";
 		if(uriparts.length > 0) {
 			if(uriparts[0].length > 0)
@@ -487,6 +488,7 @@ trace(2);
 			else
 				uriparts.shift();
 		}
+		*/
 
 
 		var finalize = function() {
@@ -513,7 +515,7 @@ trace(2);
 //trace("args: "+uriparts);
 //trace(ti.response.status);
 			//vmm.exec(inst,method,args);
-			rv = vmm.exec(inst,method,[ti.request,ti.response]);
+			rv = vmm.exec(inst,"_main",[ti.request,ti.response]);
 		}
 		catch(e:Dynamic) {
 			if(!ti.response.headers_sent) {

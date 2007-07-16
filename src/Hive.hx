@@ -10,12 +10,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import haxe.Stack;
+import Type;
 
 typedef VarList = {
 	key: String,
 	value: String
 }
-import haxe.Stack;
 
 class Hive {
 	public static var Request	: Dynamic 	= null;
@@ -32,7 +33,7 @@ class Hive {
 
 	public function new() {	}
 
-	public function handleRequest(req:Dynamic, resp:Dynamic) {
+	public function _main(req:Dynamic, resp:Dynamic) {
 
 		//untyped neko.Lib.print(request._POST);
 		untyped {
@@ -76,15 +77,24 @@ class Hive {
 		_FILES = Request.file_vars;
 
 		try {
-			entryPoint();
+			handleRequest();
 		}
 		catch(e:Dynamic) {
 			err(e, null, haxe.Stack.exceptionStack());
 		}
 	}
 
-	public function entryPoint() : Void {
+	public function handleRequest() : Void {
 		throw "entryPoint not overridden";
+	}
+
+
+
+	///////////////////////////////////////////////////////////////////////////
+	//                     STATIC METHODS                                    //
+	///////////////////////////////////////////////////////////////////////////
+	public static function exit() {
+		neko.Sys.exit(1);
 	}
 
 	public static function err(msg, ?stack:Array<haxe.StackItem>,?exception:Array<haxe.StackItem>) {
@@ -157,12 +167,8 @@ class Hive {
 		neko.Sys.exit(1);
 	}
 
-
-
-
-
 	///////////////////////////////////////////////////////////////////////////
-	//                     STATIC METHODS                                    //
+	//                     PRINTING METHODS                                  //
 	///////////////////////////////////////////////////////////////////////////
 	public static function print(s:Dynamic) {
 		//neko.Lib.print(s);
@@ -180,64 +186,363 @@ class Hive {
 		untyped __dollar__print(s, "<br>\n");
 	}
 
-	public static function exit() {
-		neko.Sys.exit(1);
+	public static function print_r(v:Dynamic, ?htmlize:Bool, ?depth:Null<Int>,?hasNext:Bool) {
+		/*
+		Name => {
+			note => {
+				0 => null,
+				2 => Note 2,
+				1 => Note 1
+			},
+			city => Los Angeles,
+			submit => button,
+			address => 123 Anywhere street
+		}
+		*/
+		if(htmlize == null)
+			htmlize = true;
+		if(depth == null || depth<0)
+			depth = 0;
+
+		var space : String = " ";
+		var newline : String = "\n";
+		if(htmlize) {
+			space = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+			newline = "<br>\n";
+		}
+		if(hasNext == true)
+			newline = ","+newline;
+
+		var sb = new StringBuf();
+
+		switch(Type.typeof(v)) {
+		case TUnknown:
+			sb.add("[Unknown]");
+			sb.add(newline);
+		case TObject:
+			sb.add("[Object]");
+			sb.add(newline);
+		case TNull:
+			sb.add("Null");
+			sb.add(newline);
+		case TInt:
+			sb.add(v);
+			sb.add(newline);
+		case TFunction:
+			sb.add("[Function]");
+			sb.add(newline);
+		case TFloat:
+			sb.add(v);
+			sb.add(newline);
+		case TEnum(e):
+			sb.add("[Enum]");
+			sb.add(newline);
+		case TClass(c):
+			var s = c;
+			while((s = Type.getSuperClass(s)) != null) {
+				c = s;
+			}
+			var cn : String = Type.getClassName(c);
+			if(cn == "Hash" || cn == "List" || cn == "Array") {
+				sb.add("{");
+				sb.add(newline);
+
+				var it = v.keys();
+				for(i in it) {
+					for(i in 0...depth+1)
+						sb.add(space);
+					sb.add(i);
+					sb.add(" => ");
+					sb.add(print_r(v.get(i), htmlize, depth+1,it.hasNext()));
+				}
+				for(i in 0...depth)
+					sb.add(space);
+				sb.add("}");
+				sb.add(newline);
+			}
+			else if(cn == "String") {
+				sb.add(v);
+				sb.add(newline);
+			}
+			else {
+				sb.add("[Class]");
+				sb.add(newline);
+			}
+		case TBool:
+			sb.add(v);
+			sb.add(newline);
+		}
+		if(depth == 0)
+			untyped __dollar__print(sb.toString());
+		return sb.toString();
 	}
 
+
 	// convenience
+	/**
+		Encode a string for URL use.
+	*/
 	public static function urlEncode( s : String ) : String {
 		//return untyped encodeURIComponents(s);
 		return StringTools.urlEncode(s);
 	}
+	/**
+		Decode a URL encoded string.
+	*/
 	public static function urlDecode( s : String ) : String {
 		//return untyped decodeURIComponents(s.split("+").join(" "));
 		return StringTools.urlDecode(s);
 	}
+	/**
+		Convert HTML elements in a string.
+	*/
 	public static function htmlEscape( s : String ) : String {
 		return StringTools.htmlEscape(s);
 	}
+	/**
+		Strip html tags from string.
+	*/
 	public static function htmlUnescape( s : String ) : String {
 		return StringTools.htmlUnescape(s);
 	}
+	/**
+		Html encode string.
+	*/
 	public static function urlEncodedToHtml( s : String ) : String {
 		return htmlEscape(
 			Hive.urlDecode(s));
 	}
-
+	/**
+		Return a string representation of the base class of
+		any value. Also returns string representations of the
+		primary types, like Int, Bool etc.
+	*/
+	public static function getBaseClass( v : Dynamic) : String {
+		switch(Type.typeof(v)) {
+		case TUnknown:
+			return "Unknown";
+		case TObject:
+			return "Object";
+		case TNull:
+			return "Null";
+		case TInt:
+			return "Int";
+		case TFunction:
+			return "Function";
+		case TFloat:
+			return "Float";
+		case TEnum(e):
+			return "Enum";
+		case TClass(c):
+			var s = c;
+			while((s = Type.getSuperClass(s)) != null) {
+				c = s;
+			}
+			return(Type.getClassName(c));
+		case TBool:
+			return "Bool";
+		}
+		return null;
+	}
+	/**
+		Check if any value is a string.
+	*/
+	public static function isString( v : Dynamic) : Bool {
+		var c = getBaseClass(v);
+		if(c != "String")
+			return false;
+		return true;
+	}
+	/**
+		Check if any value is a Hash.
+	*/
+	public static function isHash( v : Dynamic ) : Bool {
+		var c = getBaseClass(v);
+		if(c != "Hash")
+			return false;
+		return true;
+	}
+	/**
+		Check if any value is a List.
+	*/
+	public static function isList( v : Dynamic ) : Bool {
+		var c = getBaseClass(v);
+		if(c != "List")
+			return false;
+		return true;
+	}
+	/**
+		Check if any value is an Array.
+	*/
+	public static function isArray( v : Dynamic ) : Bool {
+		var c = getBaseClass(v);
+		if(c != "Array")
+			return false;
+		return true;
+	}
+	/**
+		Check if any value is an Integer.
+	*/
+	public static function isInt( v : Dynamic) : Bool {
+		switch(Type.typeof(v)) {
+		case TUnknown:
+		case TObject:
+		case TNull:
+		case TInt:
+			return true;
+		case TFunction:
+		case TFloat:
+		case TEnum(e):
+		case TClass(c):
+		case TBool:
+		}
+		return false;
+	}
+	/**
+		Check if any value is an object.
+	*/
+	public static function isObject( v : Dynamic) : Bool {
+		switch(Type.typeof(v)) {
+		case TUnknown:
+		case TObject:
+			return true;
+		case TNull:
+		case TInt:
+		case TFunction:
+		case TFloat:
+		case TEnum(e):
+		case TClass(c):
+		case TBool:
+		}
+		return false;
+	}
+	/**
+		Check if any value is a Function.
+	*/
+	public static function isFunction( v : Dynamic) : Bool {
+		switch(Type.typeof(v)) {
+		case TUnknown:
+		case TObject:
+		case TNull:
+		case TInt:
+		case TFunction:
+			return true;
+		case TFloat:
+		case TEnum(e):
+		case TClass(c):
+		case TBool:
+		}
+		return false;
+	}
+	/**
+		Check if any value is a Float.
+	*/
+	public static function isFloat( v : Dynamic) : Bool {
+		switch(Type.typeof(v)) {
+		case TUnknown:
+		case TObject:
+		case TNull:
+		case TInt:
+		case TFunction:
+		case TFloat:
+			return true;
+		case TEnum(e):
+		case TClass(c):
+		case TBool:
+		}
+		return false;
+	}
+	/**
+		Check if any value is a Class.
+	*/
+	public static function isClass( v : Dynamic) : Bool {
+		switch(Type.typeof(v)) {
+		case TUnknown:
+		case TObject:
+		case TNull:
+		case TInt:
+		case TFunction:
+		case TFloat:
+		case TEnum(e):
+		case TClass(c):
+			return true;
+		case TBool:
+		}
+		return false;
+	}
+	/**
+		Check if any value is a Bool.
+	*/
+	public static function isBool( v : Dynamic) : Bool {
+		switch(Type.typeof(v)) {
+		case TUnknown:
+		case TObject:
+		case TNull:
+		case TInt:
+		case TFunction:
+		case TFloat:
+		case TEnum(e):
+		case TClass(c):
+		case TBool:
+			return true;
+		}
+		return false;
+	}
 	///////////////////////////////////////////////////////////////////////////
 	//                  neko.Web COMPAT STATIC METHODS                       //
 	///////////////////////////////////////////////////////////////////////////
+	/**
+		Set the HTTP response code.
+	*/
 	public static function setReturnCode(r:Int) : Void {
 		Response.setStatus(r);
 	}
-
+	/**
+		Set a HTTP response header.
+	*/
 	public static function setHeader(h : String, v : String) : Void {
 		if(Response.headers_sent)
 			err("Headers already sent", haxe.Stack.callStack());
 		Response.setHeader(h, v);
 	}
-
+	/**
+		Set an HTTP cookie.
+	*/
 	public static function setCookie(cookie : HttpCookie) {
 		if(Response.headers_sent) {
 			err("Headers already sent", haxe.Stack.callStack());
 		}
 		Response.setCookie(cookie);
 	}
-
+	/**
+		Redirect to url.
+	*/
 	public static function redirect(url : String) : Void {
 		setHeader("Location", url);
 		setReturnCode(302);
 	}
+	/**
+		Return the request uri.
+	*/
 	public static function getURI(Void) : String { return Request.url; }
+	/**
+		Return the raw POST variable string. In the case of multipart
+		this value will be empty.
+	*/
 	public static function getPostData(Void) : String { return Request.post_data; }
+	/**
+		Return the raw GET variable string (everything after ? in the URI).
+	*/
 	public static function getParamsString(Void) : String { return Request.args; }
-	public static function getParams(Void) : Hash<Dynamic> { return _GET; }
-	public static function getParamValues(param : String) : Dynamic {
-		return _GET.get(param);
-	}
+	/**
+		Return the server hostname.
+	*/
 	public static function getHostName() : String {
 		return Std.string(Request.host);
 	}
+	/**
+		Current script working directory.
+	*/
 	public static function getCwd(Void) : String {
 		var p : String = Request.path_translated;
 		if(Request.path.charAt(0) != "/")
@@ -246,24 +551,40 @@ class Hive {
 		p = p.substr(0,p.lastIndexOf("/"));
 		return p;
 	}
-	public static function getCookies() : Hash<String> {
+	/**
+		Return array of HttpCookies.
+	*/
+	public static function getCookies() : Array<HttpCookie> {
+		return Request.getCookies();
+
+	}
+	/**
+		Return a hash of the cookie name value pairs.
+		Unlike the Hive._COOKIE variable, no array like
+		hashing is done on the cookie values.
+	*/
+	public static function getCookieAsString() : Hash<String> {
 		var rv = new Hash<String>();
 		var cv : Array<HttpCookie> = Request.getCookies();
 		for(i in cv)
 			rv.set(i.getName(), i.getValue());
 		return rv;
 	}
+	/**
+		Return string IP address of remote client.
+	*/
 	public static function getClientIP() : String {
 		return Request.client.remote_host.toString();
 	}
-	public static function getClientHeaders() : List<{ value : String, header : String }> {
-		var rv = new List<{ value : String, header : String }>();
-		var h : List<{key: String,value: String}> = Request.headers_in;
-		for(i in h) {
-			rv.add({value:i.value,header:i.key});
-		}
-		return rv;
+	/**
+		Return all webbrowser headers sent to server.
+	*/
+	public static function getClientHeaders() : List<{ key : String, value : String }> {
+		return Request.headers_in;
 	}
+	/**
+		Return value of a specific client header.
+	*/
 	public static function getClientHeader(k : String) : String {
 		return Request.getHeaderIn(k);
 	}
@@ -272,6 +593,12 @@ class Hive {
 		var t = { user:"Me",pass:"me"};
 		return t;
 	}
+	/**
+		Flush the output buffer. If headers have not been sent
+		yet, they will be output by using this function. This
+		comes in handy for any long running process, or for
+		displaying content before the script is finished executing.
+	*/
 	public static function flush() : Void {
 		send_message(HiveThreadMessage.FLUSH);
 	}
@@ -321,7 +648,24 @@ class Hive {
 		return source.get(name);
 	}
 
-
+	/**
+		Parses a GET style string into an associative hash.
+		The associative hash creates a 'hash of hashes' or
+		key-string pairs from GET, POST and COOKIE vars, much
+		like PHP's implementation of _POST. By creating form fields
+		with empty brackets [], all similar variable names are added
+		to the Hash as integer values. Any specific name contained
+		in the brackets will set that key to the value of the form
+		field or GET variable.
+		For example:
+		<input type='text' name='foo[]' value='zero'>
+		<input type='text' name='foo[]' value='one'>
+		Will create a hash with one key 'foo' that is a hash
+		with two keys '0' and '1' that contain the values 'zero'
+		and 'one' respectively.
+		This method is the same one used to create _GET,
+		_POST and _COOKIE out of the client request.
+	*/
 	public static function parseVars(s:String) : Hash<Dynamic> {
 		var rv = new Hash<Dynamic>();
 		var args = s.split("&");
@@ -403,9 +747,13 @@ class Hive {
 		}
 		// has name and element
 		// if name exists, and is not a hash, make a new hash
-		// as name, killing any old value.
+		// taking any old value and making it the first entry
+		// in the new hash.
 		if(Type.getClassName(Type.getClass(h.get(name))) != "Hash") {
+			var oldval = h.get(name);
 			h.set(name, new Hash<Dynamic>());
+			if(oldval != null)
+				h.get(name).set("0", oldval);
 		}
 		makeHashFromSpec(element,value,h.get(name),recursion+1);
 		//trace(h);
@@ -452,6 +800,14 @@ class Hive {
 	}
 
 
+	///////////////////////////////////////////////////////////////////////////
+	//                  PRIVATE STATIC UTILITY METHODS                       //
+	///////////////////////////////////////////////////////////////////////////
+	// this function does not actually 'exist' in the ndll. It is
+	// overridden by the loader to a haXe function that handles sending
+	// messages to the worker thread. This increases security by not
+	// exposing the ModNeko instance, or the thread instance to the
+	// module.
 	static var send_message = neko.Lib.load("hive","send_message",1);
 }
 
