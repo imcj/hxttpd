@@ -33,6 +33,12 @@ class Hive {
 
 	public function new() {	}
 
+	/**
+		Do not override or call this function. It is called
+		automatically at the beginning of each client request,
+		and will call handleRequest() when it is ready for
+		your handler to continue.
+	*/
 	public function _main(req:Dynamic, resp:Dynamic) {
 
 		//untyped neko.Lib.print(request._POST);
@@ -84,6 +90,11 @@ class Hive {
 		}
 	}
 
+	/**
+		When creating an instance of Hive, this method must
+		be overridden, and is the main entry point of that
+		handles each client request.
+	*/
 	public function handleRequest() : Void {
 		throw "entryPoint not overridden";
 	}
@@ -170,22 +181,34 @@ class Hive {
 	///////////////////////////////////////////////////////////////////////////
 	//                     PRINTING METHODS                                  //
 	///////////////////////////////////////////////////////////////////////////
+	/**
+		Print, shortcut for neko.Lib.print
+	*/
 	public static function print(s:Dynamic) {
-		//neko.Lib.print(s);
 		untyped __dollar__print(s);
 	}
 
+	/**
+		Print, adding newline character. Shortcut for
+		neko.Lib.println. To add breaks to the line,
+		see printbr()
+	*/
 	public static function println(s:Dynamic) {
-		//neko.Lib.println(s);
 		untyped __dollar__print(s,"\n");
 	}
-
+	/**
+		Print, adding an html break and a newline
+	*/
 	public static function printbr(s:Dynamic) {
-		//neko.Lib.print(s);
-		//neko.Lib.print("<br>\n");
 		untyped __dollar__print(s, "<br>\n");
 	}
 
+	/**
+		Print out an indented text representation
+		of any value, like PHP's print_r. Will format
+		in HTML by default, by placing breaks at the end
+		of each line. Set htmlize to false to disable.
+	*/
 	public static function print_r(v:Dynamic, ?htmlize:Bool, ?depth:Null<Int>,?hasNext:Bool) {
 		/*
 		Name => {
