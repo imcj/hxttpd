@@ -38,16 +38,14 @@ class Post extends Hive {
 		Hive.print("<h2>formHash(note)</h2>\n");
 		trace(Hive.formHash("note"));
 
+		Hive.print("<h2>print_r(Hive._POST)</h2>\n");
+		Hive.print_r(Hive._POST);
 
 		Hive.print("<h2>Cookies</h2>");
 		for(i in Hive._COOKIE.keys()) {
 			Hive.printbr("Client cookie name: " + Hive.urlEncodedToHtml(i) + " value: " + Hive.urlEncodedToHtml(Hive._COOKIE.get(i)));
 		}
 		Hive.printbr("The cookie named fooexpire should not appear in the list above");
-
-		Hive.print("<h2>print_r</h2>\n");
-		Hive.print_r(Hive._POST);
-
 
 		Hive.print("<h2>Flush test</h2>\n");
 		Hive.flush();

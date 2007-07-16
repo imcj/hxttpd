@@ -245,7 +245,10 @@ class Hive {
 			var cn : String = Type.getClassName(c);
 			if(cn == "Hash" || cn == "List" || cn == "Array") {
 				sb.add("{");
-				sb.add(newline);
+				if(htmlize)
+					sb.add("<br>\n");
+				else
+					sb.add("\n");
 
 				var it = v.keys();
 				for(i in it) {
