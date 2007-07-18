@@ -22,7 +22,7 @@ import HttpdPlugin;
 class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
 	public static var SERVER_VERSION 	: String	= "0.3";
-	public static var default_port 		: Int		= 80;
+	public static var default_port 		: Int		= 3000;
 	public static var log_format		: String 	= "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\"";
 	public static var debug_level		: Int		= 0;
 	public var document_root		: String;

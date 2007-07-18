@@ -5,8 +5,10 @@ all: dummy
 	haxe -neko Index.n -main Index Index.hx
 dummy:
 
-clean:
-	@rm -f *.neko
+clean: distclean
 	@rm -f *.n
+
+distclean:
 	@rm -f *.hx~
+	@rm -f *.neko
 

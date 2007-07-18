@@ -1,30 +1,42 @@
-CC=gcc
+include ../Makefile.config
+
 PLUGINS=mod_test.ndll
 PLUGINS_HAXE=ModTest.n 
-LIBPATH=
-INCPATH=-I ./ -I /usr/include/neko
-LIBS=-lneko
 
-all: $(PLUGINS) $(PLUGINS_HAXE) install
+all: archtest $(PLUGINS) $(PLUGINS_HAXE)
 
 %.ndll: %.o
 	$(CC) -Wfatal-errors $(LIBPATH) $(INCPATH) -Wall -shared -o $@ $< $(LIBS)
+	@mv *.ndll ../ndll/$(ARCH_CAP)
 
-%.o: %.c
+%.o: %.c archtest
 	$(CC) -Wfatal-errors -c $(INCPATH) -Wall -o $@ $<
 
 #%.n: %.hx
 #	haxe -cp ../src -neko $@ $<
 
-ModTest.n:
-	haxe -cp ../src -neko ModTest.n -main ModTest ModTest.hx
+ModTest.n: archtest dummy
+	haxe -cp ../src -neko ModTest.n -main ModTest ModTest.hx -D $(BUILD)
+	@mv ModTest.n ../ndll/$(ARCH_CAP)
 
 install:
-	@mv *.ndll ../bin
-	@mv *.n ../bin
 
-clean:
+clean: distclean
+	@rm -f ../bin/*.n
+	@rm -f ../ndll/Linux/*.ndll
+	@rm -f ../ndll/Windows/*.ndll
+	@rm -f ../ndll/Mac/*.ndll
+	@rm -f ../ndll/BSD/*.ndll
+
+distclean:
 	@rm -f *.o
-	@rm -f *.n
-	@rm -f *.ndll
+
+dummy:
+
+archtest:
+	@if [ "L$(ARCH_CAP)" == "L" ]; then \
+		echo "You must specify the architecture to build for (make ARCH=?): "; \
+		echo " ARCH: linux windows wine"; \
+		exit 1; \
+	fi;
 
