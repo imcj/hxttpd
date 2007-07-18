@@ -280,7 +280,7 @@ static value thread_equal(value t1, value t2) {
 
 static void thread_exit() {
 #ifdef NEKO_WINDOWS
-	ThreadExit();
+	ExitThread(0);
 #else
         pthread_exit(NULL);
 #endif
