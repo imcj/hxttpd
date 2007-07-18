@@ -165,7 +165,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	}
 
 	function registerPlugin(name:String) : Bool {
-		logTrace("Initialising module "+name+"...",1);
+		neko.Lib.print("Initialising module "+name+"...");
 
 		for(i in plugins) {
 			if(i.name == name) {

@@ -36,7 +36,7 @@ dummy:
 archtest:
 	@if [ "L$(ARCH_CAP)" == "L" ]; then \
 		echo "You must specify the architecture to build for (make ARCH=?): "; \
-		echo " ARCH: linux windows wine"; \
+		echo " ARCH: linux windows mac bsd wine"; \
 		exit 1; \
 	fi;
 
