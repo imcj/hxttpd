@@ -12,7 +12,6 @@
 
 class Server {
 	public static var HOST = "localhost";
-	public static var PORT = 2000;
 	static function main() {
 		var s = new HxTTPDTinyServer();
 		s.keepalive_enabled = true;
