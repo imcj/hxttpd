@@ -6,11 +6,11 @@ PLUGINS_HAXE=ModTest.n
 all: archtest $(PLUGINS) $(PLUGINS_HAXE)
 
 %.ndll: %.o
-	$(CC) -Wfatal-errors $(LIBPATH) $(INCPATH) -Wall -shared -o $@ $< $(LIBS)
+	$(CC) $(LIBPATH) $(INCPATH) -Wall -shared -o $@ $< $(LIBS)
 	@mv *.ndll ../ndll/$(ARCH_CAP)
 
 %.o: %.c archtest
-	$(CC) -Wfatal-errors -c $(INCPATH) -Wall -o $@ $<
+	$(CC) -c $(INCPATH) -Wall -o $@ $<
 
 #%.n: %.hx
 #	haxe -cp ../src -neko $@ $<

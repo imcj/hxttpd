@@ -8,10 +8,10 @@ LIBS=-lneko
 all: archtest $(NDLLS) install
 
 %.ndll: %.o
-	$(CC) -Wfatal-errors $(LIBPATH) $(INCPATH) -Wall -shared -o $@ $< $(LIBS)
+	$(CC) $(LIBPATH) $(INCPATH) -Wall -shared -o $@ $< $(LIBS)
 
 %.o: %.c
-	$(CC) -Wfatal-errors -c $(INCPATH) -Wall -o $@ $<
+	$(CC) -c $(INCPATH) -Wall -o $@ $<
 
 install:
 	@mv *.ndll ../ndll/$(ARCH_CAP)
