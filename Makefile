@@ -16,7 +16,7 @@ doc: dummy
 	haxe -xml doc/docs.xml build.hxml && cd doc && haxedoc docs.xml && rm docs.xml
 
 archtest:
-	@if [ "L$(ARCH_CAP)" == "L" ]; then \
+	@if [ -z $(ARCH_CAP) ]; then \
 		echo "You must specify the architecture to build for (make ARCH=?): "; \
 		echo " ARCH: linux windows mac bsd wine"; \
 		exit 1; \
