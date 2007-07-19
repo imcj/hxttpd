@@ -22,6 +22,9 @@ archtest:
 		exit 1; \
 	fi;
 
+install:
+	$(NEKO) run.n
+
 clean:
 	cd plugins && $(MAKE) clean
 	cd neko && $(MAKE) clean
