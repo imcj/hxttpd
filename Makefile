@@ -6,7 +6,7 @@ all: archtest dummy
 	cd neko && $(MAKE)
 	cd html && $(MAKE)
 	$(NEKOTOOLS) boot bin/hxttpd.n
-	@mv bin/hxttpd bin/hxttpd-$(ARCH)-bin
+	@mv bin/hxttpd$(EXE) bin/hxttpd-$(ARCH)-bin$(EXE)
 
 run:
 #	cd html && neko ../bin/hxttpd.n
@@ -14,9 +14,6 @@ run:
 
 doc: dummy
 	haxe -xml doc/docs.xml build.hxml && cd doc && haxedoc docs.xml && rm docs.xml
-	
-
-dummy:
 
 archtest:
 	@if [ "L$(ARCH_CAP)" == "L" ]; then \
@@ -24,7 +21,6 @@ archtest:
 		echo " ARCH: linux windows mac bsd wine"; \
 		exit 1; \
 	fi;
-
 
 clean:
 	cd plugins && $(MAKE) clean
@@ -46,3 +42,5 @@ distclean:
 	@rm -f src/neko/io/*.hx~
 	@rm -f *~
 	@rm -f tests/*~
+
+dummy:
