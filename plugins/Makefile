@@ -16,7 +16,7 @@ all: archtest $(PLUGINS) $(PLUGINS_HAXE)
 #	haxe -cp ../src -neko $@ $<
 
 ModTest.n: archtest dummy
-	haxe -cp ../src -neko ModTest.n -main ModTest ModTest.hx -D $(BUILD)
+	haxe -cp ../src -cp . -neko ModTest.n -main ModTest ModTest.hx -D $(BUILD)
 	@mv ModTest.n ../ndll/$(ARCH_CAP)
 
 install:
