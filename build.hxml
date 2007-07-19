@@ -2,3 +2,9 @@
 -main Server.hx
 -cp src
 --override
+
+--next
+
+-neko run.n
+-main Installer.hx
+

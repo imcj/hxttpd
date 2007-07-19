@@ -24,17 +24,6 @@ class TmpFile {
 		return fo;
 	}
 
-#if BUILD_LINUX
-	private static var tmpfile_open = neko.Lib.load("ndll/Linux/tmpfile","tmpfile_open",0);
-	private static var tmpfile_close = neko.Lib.load("ndll/Linux/tmpfile", "tmpfile_close", 1);
-#else BUILD_WINDOWS
-	private static var tmpfile_open = neko.Lib.load("ndll/Windows/tmpfile","tmpfile_open",0);
-	private static var tmpfile_close = neko.Lib.load("ndll/Windows/tmpfile", "tmpfile_close", 1);
-#else BUILD_BSD
-	private static var tmpfile_open = neko.Lib.load("ndll/BSD/tmpfile","tmpfile_open",0);
-	private static var tmpfile_close = neko.Lib.load("ndll/BSD/tmpfile", "tmpfile_close", 1);
-#else BUILD_MAC
-	private static var tmpfile_open = neko.Lib.load("ndll/Mac/tmpfile","tmpfile_open",0);
-	private static var tmpfile_close = neko.Lib.load("ndll/Mac/tmpfile", "tmpfile_close", 1);
-#end
+	private static var tmpfile_open = neko.Lib.load("tmpfile","tmpfile_open",0);
+	private static var tmpfile_close = neko.Lib.load("tmpfile", "tmpfile_close", 1);
 }

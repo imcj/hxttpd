@@ -6,7 +6,7 @@ all: archtest dummy
 	cd neko && $(MAKE)
 	cd html && $(MAKE)
 	$(NEKOTOOLS) boot bin/hxttpd.n
-	@mv bin/hxttpd bin/hxttpd-bin
+	@mv bin/hxttpd bin/hxttpd-$(ARCH)-bin
 
 run:
 #	cd html && neko ../bin/hxttpd.n

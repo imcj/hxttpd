@@ -143,34 +143,11 @@ class ThreadExtra {
 		return thread_equal(thread1.handle, thread2.handle);
 	}
 
-#if BUILD_LINUX
-	static var thread_create = neko.Lib.load("ndll/Linux/threadextra","thread_create",2);
-	static var thread_current = neko.Lib.load("ndll/Linux/threadextra","thread_current",0);
-	static var thread_send = neko.Lib.load("ndll/Linux/threadextra","thread_send",2);
-	static var thread_read_message = neko.Lib.load("ndll/Linux/threadextra","thread_read_message",1);
-	static var thread_exit = neko.Lib.load("ndll/Linux/threadextra","thread_exit",0);
-	static var thread_equal = neko.Lib.load("ndll/Linux/threadextra","thread_equal",2);
-#else BUILD_WINDOWS
-	static var thread_create = neko.Lib.load("ndll/Windows/threadextra","thread_create",2);
-	static var thread_current = neko.Lib.load("ndll/Windows/threadextra","thread_current",0);
-	static var thread_send = neko.Lib.load("ndll/Windows/threadextra","thread_send",2);
-	static var thread_read_message = neko.Lib.load("ndll/Windows/threadextra","thread_read_message",1);
-	static var thread_exit = neko.Lib.load("ndll/Windows/threadextra","thread_exit",0);
-	static var thread_equal = neko.Lib.load("ndll/Windows/threadextra","thread_equal",2);
-#else BUILD_BSD
-	static var thread_create = neko.Lib.load("ndll/BSD/threadextra","thread_create",2);
-	static var thread_current = neko.Lib.load("ndll/BSD/threadextra","thread_current",0);
-	static var thread_send = neko.Lib.load("ndll/BSD/threadextra","thread_send",2);
-	static var thread_read_message = neko.Lib.load("ndll/BSD/threadextra","thread_read_message",1);
-	static var thread_exit = neko.Lib.load("ndll/BSD/threadextra","thread_exit",0);
-	static var thread_equal = neko.Lib.load("ndll/BSD/threadextra","thread_equal",2);
-#else BUILD_MAC
-	static var thread_create = neko.Lib.load("ndll/Mac/threadextra","thread_create",2);
-	static var thread_current = neko.Lib.load("ndll/Mac/threadextra","thread_current",0);
-	static var thread_send = neko.Lib.load("ndll/Mac/threadextra","thread_send",2);
-	static var thread_read_message = neko.Lib.load("ndll/Mac/threadextra","thread_read_message",1);
-	static var thread_exit = neko.Lib.load("ndll/Mac/threadextra","thread_exit",0);
-	static var thread_equal = neko.Lib.load("ndll/Mac/threadextra","thread_equal",2);
-#end
+	static var thread_create = neko.Lib.load("threadextra","thread_create",2);
+	static var thread_current = neko.Lib.load("threadextra","thread_current",0);
+	static var thread_send = neko.Lib.load("threadextra","thread_send",2);
+	static var thread_read_message = neko.Lib.load("threadextra","thread_read_message",1);
+	static var thread_exit = neko.Lib.load("threadextra","thread_exit",0);
+	static var thread_equal = neko.Lib.load("threadextra","thread_equal",2);
 }
 
