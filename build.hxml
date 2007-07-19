@@ -7,4 +7,4 @@
 
 -neko run.n
 -main Installer.hx
-
+-cp .
