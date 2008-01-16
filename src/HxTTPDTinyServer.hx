@@ -256,7 +256,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
 		//Std.string(cnx.sock.peer().host.ip);
 		cdata.remote_host = new Host(neko.net.Host.localhost());
-		untyped { cdata.remote_host.ip = sock.peer().host; }
+		untyped { cdata.remote_host.ip = sock.peer().host.ip; }
 
 		logTrace(here.methodName + " New connection from "+ cdata.remote_host.toString() + " port: "+ Std.string(cdata.remote_port),2);
 		return cdata;
@@ -309,7 +309,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		}
 	}
 
-        override public function onClientData( d : HttpdClientData, buf : String, bufpos : Int, buflen : Int ) : Int {
+	override public function onClientData( d : HttpdClientData, buf : String, bufpos : Int, buflen : Int ) : Int {
 		//trace("\n>> "+here.methodName + "\n>> buf: "+buf+"\n>> bufpos: "+bufpos+"\n>> buflen: "+buflen);
 		if( d.state == HttpdClientData.STATE_WAITING || d.state == HttpdClientData.STATE_KEEPALIVE) {
 			var s = buf.substr(bufpos, buflen);
