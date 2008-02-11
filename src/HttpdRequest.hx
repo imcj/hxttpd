@@ -624,12 +624,13 @@ class HttpdRequest {
 				try{
 					bytesRead = fi.readBytes(buf, 0, DEFAULT_BUFSIZE);
 				}
-				catch(e:neko.io.Eof) {}
+				catch(e:neko.io.Eof) {
+					eof = true;
+				}
 				catch(e:Dynamic) {
 					trace("POST data io error");
 					return;
 				}
-				eof = fi.eof();
 
 				p = buf.indexOf(boundary);
 

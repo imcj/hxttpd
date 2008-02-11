@@ -255,8 +255,9 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
 
 		//Std.string(cnx.sock.peer().host.ip);
-		cdata.remote_host = new Host(neko.net.Host.localhost());
-		untyped { cdata.remote_host.ip = sock.peer().host.ip; }
+		//cdata.remote_host = new Host(neko.net.Host.localhost());
+		//untyped { cdata.remote_host.ip = sock.peer().host.ip; }
+		cdata.remote_host = sock.peer().host;
 
 		logTrace(here.methodName + " New connection from "+ cdata.remote_host.toString() + " port: "+ Std.string(cdata.remote_port),2);
 		return cdata;
