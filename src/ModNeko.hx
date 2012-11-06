@@ -56,7 +56,6 @@ class ModNeko extends HttpdPlugin {
 	}
 
 	private function init_mod_neko() {
-		trace(here.methodName);
 		neko.Sys.putEnv("MOD_NEKO", "1");
 		///var funcs = new Hash<Dynamic>();
 		var me = this;
@@ -205,7 +204,7 @@ class ModNeko extends HttpdPlugin {
 			});
 
 		var lp = function (spec:String, nargs:Int) {
-			//trace(here.methodName + " " + spec + " "+nargs);
+			//trace( " " + spec + " "+nargs);
 			var l = spec.length;
 			if(l > 9 && spec.substr(0,9) == 'mod_neko@') {
 				spec = spec.substr(9,l-9);
@@ -250,7 +249,7 @@ class ModNeko extends HttpdPlugin {
 
 		// check module cache
 		var oldCache = loader.getCache();
-		HxTTPDTinyServer.logTrace(here.methodName + " running module "+moduleName,4);
+		HxTTPDTinyServer.logTrace( " running module "+moduleName,4);
 		var vmm = loader.getCache().get(moduleName);
 		var main = module_cache.get(moduleName);
 		if(vmm != null &&
@@ -260,7 +259,7 @@ class ModNeko extends HttpdPlugin {
 			)
 		)
 		{
-			HxTTPDTinyServer.logTrace(here.methodName + " reloading module "+moduleName,3);
+			HxTTPDTinyServer.logTrace( " reloading module "+moduleName,3);
 			vmm = null;
 		}
 		if(vmm == null) {
@@ -269,7 +268,7 @@ class ModNeko extends HttpdPlugin {
 				vmm = loader.loadModule(moduleName);
 			}
 			catch(e:Dynamic) {
-				trace(here.methodName + " " + e);
+				trace( " " + e);
 				redirect(null);
 				return HttpdPlugin.ERROR;
 			}
@@ -296,7 +295,7 @@ class ModNeko extends HttpdPlugin {
 		cur_response = response;
 		var uri = request.path;
 		var docroot = request.path_translated;
-		//trace(here.methodName + " docroot: "+docroot+" uri " + uri);
+		//trace( " docroot: "+docroot+" uri " + uri);
 
 		var pos = uri.indexOf(".n");
 		if(pos < 1)
@@ -315,9 +314,9 @@ class ModNeko extends HttpdPlugin {
 		}
 		if(idx < 0) return HttpdPlugin.SKIP;
 
-		//trace(here.methodName + " Application is " + parts[idx]);
+		//trace( " Application is " + parts[idx]);
 		uri = "/" + parts.slice(0,idx+1).join("/");
-		//trace(here.methodName + " New uri is " + uri);
+		//trace( " New uri is " + uri);
 
 		var path : String = docroot + uri;
 		var fileinfo = checkFile(path);
@@ -338,7 +337,7 @@ class ModNeko extends HttpdPlugin {
 
 		response.setStatus(0);
 		var rv = runModule(request, response, moduleName, path, sbPathInfo.toString(), fileinfo.d);
-		HxTTPDTinyServer.logTrace(here.methodName + " "+rv,5);
+		HxTTPDTinyServer.logTrace( " "+rv,5);
 		if(rv == HttpdPlugin.COMPLETE) {
 			//setResponseHeader(response, "Content-Type","text/html");
 			setResponseHeader(response, "Last-Modified", GmtDate.timestamp());
@@ -358,7 +357,7 @@ class ModNeko extends HttpdPlugin {
 		// TODO: sync this function with ModHive
 		var stat : Dynamic;
 		try {
-			switch(neko.FileSystem.kind(path)) {
+			switch(ModHive.fileSystemKind(path)) {
 			case kdir:
 				return { r:HttpdPlugin.SKIP, d:null };
 			case kother(k):

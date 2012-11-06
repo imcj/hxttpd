@@ -37,7 +37,8 @@ static void tmpfile_error( const char *msg ) {
 **/
 static value tmpfile_open() {
         fio * f;
-	vkind k_file = kind_import("file");
+	vkind k_file;
+        kind_share(k_file, "file");
 
 	if(k_file == NULL)
 		tmpfile_error("tmpfile_open k_file");
@@ -60,7 +61,8 @@ static value tmpfile_open() {
 **/
 static value tmpfile_close( value o ) {
         fio *f;
-	vkind k_file = kind_import("file");
+	vkind k_file;
+        kind_share(k_file, "file");
         val_check_kind(o,k_file);
         f = val_file(o);
         fclose(f->io);

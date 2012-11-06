@@ -35,7 +35,7 @@ class VmModule {
 		timestamp = Date.now();
 		var parts = name.split("/");
 		this.name = parts.pop();
-		filename = m.name();
+		filename = m.name;
 		main = null;
 		instances = new Hash();
 		if(noexec == true)

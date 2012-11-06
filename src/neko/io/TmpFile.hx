@@ -11,17 +11,16 @@
 // limitations under the License.
 
 package neko.io;
-import neko.io.File;
 
 class TmpFile {
 	private var fi : FileInput;
 	private var fo : FileOutput;
-	private var __f : FileHandle;
+	private var __f : Dynamic;
 
 	public function new() : Void {
 		__f = untyped tmpfile_open();
-		fi = new FileInput(__f);
-		fo = new FileOutput(__f);
+		fi = untyped new FileInput(__f);
+		fo = untyped new FileOutput(__f);
 	}
 
 	public function close() : Void {

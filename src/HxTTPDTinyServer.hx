@@ -213,7 +213,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	*/
 
 	override public function onInternalError( d : HttpdClientData, e : Dynamic ) {
-		logTrace(here.methodName,3);
+		logTrace(3);
 		d.setResponse(500);
 		d.response.setMessage(HttpdResponse.codeToHtml(500));
 		d.response.keepalive = false;
@@ -241,7 +241,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 			removeWriteSock(d.sock);
 			d.endRequest();
 			//if(d.state == ConnectionState.STATE_CLOSING) {
-			//	trace(here.methodName + " closing");
+			//	trace(" closing");
 			//	closeConnection(d.sock);
 			//}
 		}
@@ -259,7 +259,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		//untyped { cdata.remote_host.ip = sock.peer().host.ip; }
 		cdata.remote_host = sock.peer().host;
 
-		logTrace(here.methodName + " New connection from "+ cdata.remote_host.toString() + " port: "+ Std.string(cdata.remote_port),2);
+		logTrace(" New connection from "+ cdata.remote_host.toString() + " port: "+ Std.string(cdata.remote_port),2);
 		return cdata;
 	}
 
@@ -299,7 +299,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 			case HttpdClientData.STATE_PROCESSING:
 				i.timer = 0;
 			case HttpdClientData.STATE_KEEPALIVE:
-				//trace(here.methodName + " client keepalive "+ i.timer+"/"+keepalive_timeout);
+				//trace(" client keepalive "+ i.timer+"/"+keepalive_timeout);
 				if(i.timer >= keepalive_timeout) {
 					logTrace("Keepalive timeout",3);
 					closeConnection(i.sock);
@@ -311,7 +311,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	}
 
 	override public function onClientData( d : HttpdClientData, buf : String, bufpos : Int, buflen : Int ) : Int {
-		//trace("\n>> "+here.methodName + "\n>> buf: "+buf+"\n>> bufpos: "+bufpos+"\n>> buflen: "+buflen);
+		//trace("\n>> "+"\n>> buf: "+buf+"\n>> bufpos: "+bufpos+"\n>> buflen: "+buflen);
 		if( d.state == HttpdClientData.STATE_WAITING || d.state == HttpdClientData.STATE_KEEPALIVE) {
 			var s = buf.substr(bufpos, buflen);
 			var i = s.indexOf("\r\n\r\n");
@@ -358,7 +358,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	function beginRequest( d : HttpdClientData, buf : String,  bufpos : Int, buflen : Int ) : Bool {
 		var data : String  = buf.substr(bufpos, buflen);
 
-		logTrace(here.methodName + " >> INPUT DATA FOLLOWS\n"+StringTools.trim(data)+"\nINPUT DATA END >> bufpos: "+bufpos+" buflen: "+buflen,4);
+		logTrace(" >> INPUT DATA FOLLOWS\n"+StringTools.trim(data)+"\nINPUT DATA END >> bufpos: "+bufpos+" buflen: "+buflen,4);
 
 		d.startNewRequest();
 		data = StringTools.replace(data, "\r\n", "\n");
@@ -390,7 +390,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		//Content-Type: multipart/form-data; boundary=----------Jud
 		//Content-Length: 300000
 		if( d.req.in_content_type != null) {
-			logTrace(here.methodName + " Switching to STATE_DATA for content_length "+d.req.in_content_length);
+			logTrace(" Switching to STATE_DATA for content_length "+d.req.in_content_length);
 			d.awaitPost();
 			return false;
 		}
@@ -426,7 +426,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 		case HttpdPlugin.PROCESSING:
 			return;
 		default:
-			logTrace(here.methodName + " unhandled response");
+			logTrace(" unhandled response");
 		}
 		d.response.prepare();
 		d.response.send();	// handles connection closing
@@ -484,7 +484,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 			}
 		}
 		else d.req.path = "/";
-		//trace(here.methodName + " new path: " + d.req.path);
+		//trace(" new path: " + d.req.path);
 		return true;
 	}
 
@@ -535,7 +535,7 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 
 		var p = d.req.path;
 		d.req.path_translated += p;
-		logTrace(here.methodName + " final: " + d.req.path_translated,2);
+		logTrace(" final: " + d.req.path_translated,2);
 
 		try {
 			switch(FileSystem.kind(d.req.path_translated)) {
@@ -630,8 +630,8 @@ class HxTTPDTinyServer extends HttpdServerLoop<HttpdClientData> {
 	public static function logTrace(s:String, ?level:Int) {
 		if(level==null) level = 5;
 		if(level <= debug_level) {
-			neko.io.File.stdout().write(s+"\n");
-			neko.io.File.stdout().flush();
+			Sys.stdout ( ).writeString(s+"\n");
+			Sys.stdout ( ).flush();
 		}
 	}
 

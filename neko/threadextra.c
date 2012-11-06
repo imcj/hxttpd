@@ -286,7 +286,7 @@ static void thread_exit() {
 #endif
 }
 
-static void free_lock( value l ) {
+static void free_lock2( value l ) {
 #	ifdef NEKO_WINDOWS
 	CloseHandle( val_lockextra(l) );
 #	else
@@ -313,7 +313,7 @@ static value lock_create() {
 		neko_error();
 #	endif
 	vl = alloc_abstract(k_lockextra,l);
-	val_gc(vl,free_lock);
+	val_gc(vl,free_lock2);
 	return vl;
 }
 
@@ -325,7 +325,7 @@ static value lock_create() {
 	acquired as many times
 	</doc>
 **/
-static value lock_release( value lock ) {
+static value lock_release2( value lock ) {
 	vlock l;
 	val_check_kind(lock,k_lockextra);
 	l = val_lockextra(lock);
@@ -407,4 +407,4 @@ DEFINE_PRIM(thread_equal,2);
 
 DEFINE_PRIM(lock_create,0);
 DEFINE_PRIM(lock_wait,2);
-DEFINE_PRIM(lock_release,1);
+DEFINE_PRIM(lock_release2,1);

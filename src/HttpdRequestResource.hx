@@ -94,7 +94,7 @@ class HttpdRequestResource {
 		return sval.toString();
 	}
 
-	public function copyTo(o : neko.io.Output) : Bool {
+	public function copyTo(o : haxe.io.Output) : Bool {
 		if(tmpfile == null)
 			return false;
 		var fi : neko.io.FileInput;
@@ -153,7 +153,7 @@ class HttpdRequestResource {
 			try {
 				c = i.readChar();
 			}
-			catch(e:neko.io.Eof) {
+			catch(e:haxe.io.Eof) {
 				stat = 1;
 			}
 			catch(e:Dynamic) {
@@ -164,6 +164,6 @@ class HttpdRequestResource {
 			untyped __dollar__sset(s.__s,p,c);
 			p += 1;
 		}
-		return {buffer: s, bytes: p, status: stat};
+		return {buffer: s.__s, bytes: p, status: stat};
 	}
 }

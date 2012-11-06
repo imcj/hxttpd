@@ -12,6 +12,18 @@
 
 import ThreadExtra;
 
+#if cpp
+import cpp.Lib;
+#elseif neko
+import neko.Lib;
+#end
+
+enum FileKind {
+	kdir;
+	kfile;
+	kother( k : String );
+}
+
 private class ThreadInfo implements Dynamic {
 	public var buffer : StringBuf;
 	public var bufcount : Int;
@@ -154,12 +166,12 @@ class ModHive extends HttpdPlugin {
 		for(i in threads) {
 			if(i.t == null) continue;
 // 			if(i.id < 10) {
-// 				trace(here.methodName + " checking thread #"+i.id);
+// 				trace( " checking thread #"+i.id);
 // 			}
 			if(ThreadExtra.equals(i.t, th) == true)
 				return i.id;
 		}
-		neko.io.File.stdout().write("Could not locate thread.");
+		Sys.stdout().writeString("Could not locate thread.");
 		//l.release();
 		return -1;
 	}
@@ -209,11 +221,22 @@ class ModHive extends HttpdPlugin {
 		return true;
 	}
 
+	static public function fileSystemKind( path : String ) : FileKind {
+		var k = new String(sys_file_type(untyped path.__s));
+		return switch(k) {
+		case "file": kfile;
+		case "dir": kdir;
+		default: kother(k);
+		}
+	}
+
+	private static var sys_file_type = Lib.load("std","sys_file_type",1);
+
 	public function checkFile(path:String) : { r : Int, d : Date } {
 		// TODO: sync this function with ModNeko
 		var stat : Dynamic;
 		try {
-			switch(neko.FileSystem.kind(path)) {
+			switch(fileSystemKind(path)) {
 			case kdir:
 				return { r:HttpdPlugin.SKIP, d:null };
 			case kother(k):
@@ -397,7 +420,7 @@ trace(2);
 			return funcs.get(fname);
 		}
 		var lp = function (spec:String, nargs:Int) {
-			//trace(here.methodName + " " + spec + " "+nargs);
+			//trace( " " + spec + " "+nargs);
 			var l = spec.length;
 			// std@sys_exit
 			if(l == 12) {
@@ -524,7 +547,7 @@ trace(2);
 			}
 			finalize();
 			ti.request.setClientState(HttpdClientData.STATE_CLOSING);
-			trace(here.methodName + " rv: "+rv + " e: "+e);
+			trace( " rv: "+rv + " e: "+e);
 			worker.sendMessage({ id : ti.id, msg : HiveThreadMessage.SHUTDOWN });
 			return;
 		}

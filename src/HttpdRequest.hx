@@ -410,7 +410,7 @@ class HttpdRequest {
 				return false;
 			}
 			url = newUrl;
-			trace(here.methodName + " FULL URL host=" + host + ":" + Std.string(port) + " url="+url);
+			trace( " FULL URL host=" + host + ":" + Std.string(port) + " url="+url);
 		}
 		path = url;
 		return true;
@@ -425,7 +425,7 @@ class HttpdRequest {
 			return false;
 		case POST_FORM:
 		case POST_MULTIPART:
-			HxTTPDTinyServer.logTrace(here.methodName + " POST_MULTIPART");
+			HxTTPDTinyServer.logTrace( " POST_MULTIPART");
 			tmpfile = new neko.io.TmpFile();
 		}
 		return true;
@@ -445,12 +445,12 @@ class HttpdRequest {
 				throw "Post data overflow";
 			return true;
 		case POST_MULTIPART:
-			HxTTPDTinyServer.logTrace(here.methodName + " POST_MULTIPART "+buflen+" bytes from "+bufpos);
+			HxTTPDTinyServer.logTrace( " POST_MULTIPART "+buflen+" bytes from "+bufpos);
 			try {
 				tmpfile.getOutput().writeBytes(buf, bufpos, buflen);
 				//tmpfile.getOutput().write(buf.substr(bufpos,buflen));
 			} catch(e:Dynamic) {
-				trace(here.methodName + " file write error");
+				trace( " file write error");
 				return true;
 			}
 			return true;
@@ -474,12 +474,12 @@ class HttpdRequest {
 		//trace(here.methodName);
 		switch(post_type) {
 		case POST_NONE:
-			throw(here.methodName + " post_type in invalid state POST_NONE");
+			throw( " post_type in invalid state POST_NONE");
 		case POST_FORM:
 			post_vars = post_vars.concat(parseGetStyleVars(post_data));
 			//HxTTPDTinyServer.logTrace(post_vars.toString(),4);
 		case POST_MULTIPART:
-			HxTTPDTinyServer.logTrace(here.methodName + " POST_MULTIPART");
+			HxTTPDTinyServer.logTrace( " POST_MULTIPART");
 			try {
 				var fi = tmpfile.getInput();
 				fi.seek(0, SeekBegin);
@@ -588,7 +588,7 @@ class HttpdRequest {
 					return;
      				var p = i.indexOf(":");
 				if( p < 2 || p >= i.length - 1 ) {
-					HxTTPDTinyServer.logTrace(here.methodName + ": invalid short header while parsing multipart data "+i,0);
+					HxTTPDTinyServer.logTrace( ": invalid short header while parsing multipart data "+i,0);
 					return;
 				}
 				headers.set(StringTools.trim(i.substr(0, p)).toLowerCase(), StringTools.trim(i.substr(p+1)));

@@ -2,7 +2,7 @@ include ../Makefile.config
 
 NDLLS=threadextra.ndll tmpfile.ndll hive.ndll
 LIBPATH=-L/usr/lib
-INCPATH=-I ./ -I /usr/include/neko
+#INCPATH=-I ./ -I /usr/include/neko
 LIBS=-lneko
 
 all: archtest $(NDLLS) install

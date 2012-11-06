@@ -25,6 +25,7 @@
 
 import neko.net.Socket;
 import neko.net.Host;
+import haxe.io.Bytes;
 
 private typedef ServerClient<ClientData> = {
 	var sock : Socket;
@@ -151,7 +152,7 @@ class HttpdServerLoop<ClientData> {
 	public function clientWrite( s : Socket, buf : String, pos : Int, len : Int ) {
 		try {
 			while( len > 0 ) {
-				var nbytes = s.output.writeBytes(buf,pos,len);
+				var nbytes : Int = s.output.writeBytes(Bytes.ofString ( buf ),pos,len);
 				pos += nbytes;
 				len -= nbytes;
 			}
@@ -247,7 +248,7 @@ class HttpdServerLoop<ClientData> {
 				try {
 					onClientWritable(cl.data);
 				} catch( e : Dynamic ) {
-					if( !Std.is(e,neko.io.Eof) )
+					if( !Std.is(e,haxe.io.Eof) )
 						onError(e);
 					closeConnection(cl.sock);
 				}
